@@ -21,6 +21,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -388,6 +389,23 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void downloadUpdate(final String url) { MainActivity.this.downloadUpdate(url); }
         @JavascriptInterface public void installUpdate() {
             main.post(new Runnable() { @Override public void run() { MainActivity.this.installUpdate(); } });
+        }
+        /* TV remotes: focusing a text field does not open the on-screen keyboard by itself */
+        @JavascriptInterface public void showKeyboard() {
+            main.post(new Runnable() { @Override @SuppressWarnings("deprecation") public void run() {
+                if (web == null) return;
+                web.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null && !imm.showSoftInput(web, InputMethodManager.SHOW_FORCED)) {
+                    imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                }
+            } });
+        }
+        @JavascriptInterface public void hideKeyboard() {
+            main.post(new Runnable() { @Override public void run() {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null && web != null) imm.hideSoftInputFromWindow(web.getWindowToken(), 0);
+            } });
         }
         @JavascriptInterface public boolean isTv() { return isTv; }
         @JavascriptInterface public String version() { return BuildConfig.VERSION_NAME; }

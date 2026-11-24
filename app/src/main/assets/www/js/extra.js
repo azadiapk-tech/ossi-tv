@@ -105,8 +105,8 @@ function lbuild() {
       '<div class="lg-logo"><img src="img/logo.png" alt="Ossi TV"></div>' +
       '<div class="lg-card">' +
         '<h1 dir="auto">' + O.esc(t('loginTitle')) + '</h1><p class="lg-sub" dir="auto">' + O.esc(t('loginSub')) + '</p>' +
-        '<label class="lg-f" data-f="0"><span class="lg-ic">' + LI.user + '</span><input id="lgUser" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="' + O.esc(t('plUser')) + '"></label>' +
-        '<label class="lg-f" data-f="1"><span class="lg-ic">' + LI.lock + '</span><input id="lgPass" type="password" autocomplete="current-password" placeholder="' + O.esc(t('plPass')) + '"><b class="lg-eye" id="lgEye">' + LI.eye + '</b></label>' +
+        '<label class="lg-f" data-f="0"><span class="lg-ic">' + LI.user + '</span><input id="lgUser" type="text" enterkeyhint="next" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="' + O.esc(t('plUser')) + '"></label>' +
+        '<label class="lg-f" data-f="1"><span class="lg-ic">' + LI.lock + '</span><input id="lgPass" type="password" enterkeyhint="go" autocomplete="current-password" placeholder="' + O.esc(t('plPass')) + '"><b class="lg-eye" id="lgEye">' + LI.eye + '</b></label>' +
         '<div class="lg-err" id="lgErr" dir="auto"></div>' +
         '<div class="lg-btn" data-f="2" id="lgGo">' + O.esc(t('loginBtn')) + '</div>' +
       '</div>' +
@@ -115,8 +115,16 @@ function lbuild() {
   lq('lgEye').addEventListener('click', function (e) { e.preventDefault(); var p = lq('lgPass'); p.type = p.type === 'password' ? 'text' : 'password'; });
   lq('lgUser').addEventListener('focus', function () { fi = 0; lpaint(); });
   lq('lgPass').addEventListener('focus', function () { fi = 1; lpaint(); });
-  lq('lgUser').addEventListener('keydown', function (e) { if ((e.keyCode || e.which) === 13) { e.preventDefault(); e.stopPropagation(); lq('lgPass').focus(); } }, true);
-  lq('lgPass').addEventListener('keydown', function (e) { if ((e.keyCode || e.which) === 13) { e.preventDefault(); e.stopPropagation(); lq('lgPass').blur(); submit(); } }, true);
+  function fieldKey(next) {
+    return function (e) {
+      if ((e.keyCode || e.which) !== 13) return;
+      e.preventDefault(); e.stopPropagation();
+      if (!e.isTrusted && NAT && NAT.showKeyboard) { NAT.showKeyboard(); return; }   /* remote OK: open the keyboard */
+      next();
+    };
+  }
+  lq('lgUser').addEventListener('keydown', fieldKey(function () { lq('lgPass').focus(); }), true);
+  lq('lgPass').addEventListener('keydown', fieldKey(function () { lq('lgPass').blur(); if (NAT && NAT.hideKeyboard) NAT.hideKeyboard(); fi = 2; lpaint(); submit(); }), true);
   lbuilt = true;
 }
 function lpaint() {
@@ -154,7 +162,7 @@ LG.onKey = function (e, k) {
   var K = O.K, used = true;
   if (k === K.UP) { if (fi > 0) fi--; lpaint(); }
   else if (k === K.DOWN) { if (fi < 2) fi++; lpaint(); }
-  else if (k === K.ENTER) { if (fi === 2) submit(); else lq(fi === 0 ? 'lgUser' : 'lgPass').focus(); }
+  else if (k === K.ENTER) { if (fi === 2) submit(); else { lq(fi === 0 ? 'lgUser' : 'lgPass').focus(); if (NAT && NAT.showKeyboard) NAT.showKeyboard(); } }
   else if (k === K.BACK || k === K.ESC || k === K.EXIT) O.app.confirmExit();
   else used = false;
   if (used) e.preventDefault();

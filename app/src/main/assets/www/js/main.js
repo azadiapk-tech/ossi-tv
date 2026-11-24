@@ -38,6 +38,12 @@ O.app = {
 };
 
 /* ---------- keys ---------- */
+var NAT = window.OssiNative || null;
+/* any text field that gets focus on a TV: open the on-screen keyboard (Fire TV / Android TV) */
+document.addEventListener('focusin', function (e) {
+  var el = e.target;
+  if (NAT && NAT.showKeyboard && NAT.isTv && NAT.isTv() && el && el.tagName === 'INPUT') NAT.showKeyboard();
+});
 var redT = 0, redFired = false, redHeld = false, okT = 0, okSafe = 0, okHeld = false, okLong = false;
 function digitOf(k) { return (k >= 48 && k <= 57) ? k - 48 : (k >= 96 && k <= 105 ? k - 96 : -1); }
 
@@ -45,6 +51,8 @@ function onKey(e) {
   var k = e.keyCode || e.which;
   var ae = document.activeElement;
   if (ae && ae.tagName === 'INPUT') {
+    /* remote OK on a text field (synthetic key, not the keyboard's own Enter) = open the on-screen keyboard */
+    if (k === K.ENTER && !e.isTrusted && NAT && NAT.showKeyboard) { NAT.showKeyboard(); e.preventDefault(); return; }
     if (k === K.ENTER || k === K.BACK || k === K.ESC) { ae.blur(); e.preventDefault(); return; }
     if (k === K.UP || k === K.DOWN) ae.blur(); else return;
   }
