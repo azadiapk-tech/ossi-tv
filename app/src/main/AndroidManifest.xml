@@ -27,6 +27,7 @@
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
             android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan|stateHidden"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

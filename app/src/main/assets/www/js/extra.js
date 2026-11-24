@@ -119,11 +119,11 @@ function lbuild() {
     return function (e) {
       if ((e.keyCode || e.which) !== 13) return;
       e.preventDefault(); e.stopPropagation();
-      if (!e.isTrusted && NAT && NAT.showKeyboard) { NAT.showKeyboard(); return; }   /* remote OK: open the keyboard */
+      if (!e.isTrusted) { if (O.kb) O.kb(); return; }   /* remote OK: open the keyboard */
       next();
     };
   }
-  lq('lgUser').addEventListener('keydown', fieldKey(function () { lq('lgPass').focus(); }), true);
+  lq('lgUser').addEventListener('keydown', fieldKey(function () { lq('lgPass').focus(); fi = 1; lpaint(); }), true);
   lq('lgPass').addEventListener('keydown', fieldKey(function () { lq('lgPass').blur(); if (NAT && NAT.hideKeyboard) NAT.hideKeyboard(); fi = 2; lpaint(); submit(); }), true);
   lbuilt = true;
 }
@@ -162,7 +162,7 @@ LG.onKey = function (e, k) {
   var K = O.K, used = true;
   if (k === K.UP) { if (fi > 0) fi--; lpaint(); }
   else if (k === K.DOWN) { if (fi < 2) fi++; lpaint(); }
-  else if (k === K.ENTER) { if (fi === 2) submit(); else { lq(fi === 0 ? 'lgUser' : 'lgPass').focus(); if (NAT && NAT.showKeyboard) NAT.showKeyboard(); } }
+  else if (k === K.ENTER) { if (fi === 2) submit(); else lq(fi === 0 ? 'lgUser' : 'lgPass').focus(); }
   else if (k === K.BACK || k === K.ESC || k === K.EXIT) O.app.confirmExit();
   else used = false;
   if (used) e.preventDefault();

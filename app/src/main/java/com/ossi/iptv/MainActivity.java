@@ -50,6 +50,7 @@ public class MainActivity extends Activity {
     private NativePlayers players;
     private boolean isTv;
     private boolean pipAllowed;
+    private long lastKb;
     private final Handler main = new Handler(Looper.getMainLooper());
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
@@ -394,11 +395,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void showKeyboard() {
             main.post(new Runnable() { @Override @SuppressWarnings("deprecation") public void run() {
                 if (web == null) return;
-                web.requestFocus();
+                long now = android.os.SystemClock.uptimeMillis();
+                if (now - lastKb < 1500) return;                  // never more than one request in a row
+                lastKb = now;
+                if (!web.hasFocus()) web.requestFocus();
                 InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null && !imm.showSoftInput(web, InputMethodManager.SHOW_FORCED)) {
-                    imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
-                }
+                if (imm != null) imm.showSoftInput(web, InputMethodManager.SHOW_FORCED);   // show only, never toggle
             } });
         }
         @JavascriptInterface public void hideKeyboard() {
