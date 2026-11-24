@@ -40,8 +40,9 @@ VGrid.prototype.vis = function () {
 /* (re)build the spacer + rows around the current scroll position */
 VGrid.prototype.fill = function (force) {
   var el = this.el, n = this.count(), cols = this.cols, R = this.R(), rows = Math.ceil(n / cols);
-  var h = el.clientHeight || 600, st = el.scrollTop;
-  var r0 = Math.max(0, Math.floor(st / R) - 3), r1 = Math.min(rows, Math.ceil((st + h) / R) + 3);
+  var h = el.clientHeight || 600, st = el.scrollTop, CH = 8;
+  /* render in chunks of 8 rows around the viewport: the DOM is rebuilt only every 8 rows of movement */
+  var r0 = Math.max(0, (Math.floor(st / R / CH) - 1) * CH), r1 = Math.min(rows, (Math.ceil((st + h) / R / CH) + 1) * CH);
   if (!force && r0 === this.r0 && r1 === this.r1 && n === this.n) return;
   this.r0 = r0; this.r1 = r1; this.n = n;
   var css = 'position:absolute;left:0;right:0;height:' + this.itemH + 'px;grid-template-columns:repeat(' + cols + ',minmax(0,1fr));grid-gap:' + this.gap + 'px;top:';

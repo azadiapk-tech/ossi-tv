@@ -528,3 +528,26 @@ html.touch .lvepg .e-d{max-height:56px}
 .lg-btn.focus{border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.2),0 0 50px rgba(34,211,238,.5),0 0 80px rgba(217,70,239,.4)}
 .lg-btn.busy{opacity:.7}
 html.touch .lg-btn:active{filter:brightness(1.2)}
+
+/* ================= TV (remote) light mode: no blur glows, no layout animations — smooth on Fire TV sticks ================= */
+html:not(.touch) *{transition:none!important;animation-duration:0s!important}
+html:not(.touch) #splash{transition:opacity .5s!important}
+html:not(.touch) .bg{background:linear-gradient(160deg,#0b0d33 0%,#070823 50%,#03041a 100%)}
+html:not(.touch) .brand img,html:not(.touch) .lg-logo img{filter:none}
+html:not(.touch) .clock b{text-shadow:none}
+html:not(.touch) .dt-bd{filter:none;opacity:.22;transform:none}
+/* home tiles: same box, focus = scale on the compositor instead of resizing */
+html:not(.touch) #home .tile,html:not(.touch) #home .tile.focus{width:290px;height:290px;margin:0 52px;box-shadow:none;will-change:transform}
+html:not(.touch) #home .tile svg,html:not(.touch) #home .tile.focus svg{width:100px;height:100px}
+html:not(.touch) #home .tile h3,html:not(.touch) #home .tile.focus h3{font-size:32px}
+html:not(.touch) #home .tile.focus{transform:scale(1.28);transition:transform .12s ease-out!important;border-color:#fff;box-shadow:0 0 0 3px rgba(34,211,238,.6)}
+html:not(.touch) #home .tile:not(.focus){transform:scale(1);transition:transform .12s ease-out!important}
+/* cheap focus rings everywhere (solid, no blur) */
+html:not(.touch) .tile,html:not(.touch) .stile,html:not(.touch) .pc .pi,html:not(.touch) .cc .ci,html:not(.touch) .pcb,html:not(.touch) .plbadge,html:not(.touch) .subbadge,html:not(.touch) .dt-poster,html:not(.touch) .lg-card,html:not(.touch) .lg-btn{box-shadow:none}
+html:not(.touch) .ch.focus,html:not(.touch) .cat.focus,html:not(.touch) .ep.focus,html:not(.touch) .mr.focus,html:not(.touch) .stile.focus,html:not(.touch) .dbtn.focus,
+html:not(.touch) .sbox.focus,html:not(.touch) .lv-prev.focus,html:not(.touch) .lg-f.focus,html:not(.touch) .lg-btn.focus,html:not(.touch) .sn.focus{box-shadow:0 0 0 3px rgba(255,255,255,.9)}
+html:not(.touch) .pc.focus,html:not(.touch) .cc.focus{box-shadow:none;transform:none;border-color:#fff}
+html:not(.touch) .pc.focus .pi,html:not(.touch) .cc.focus .ci{box-shadow:0 0 0 4px #22d3ee}
+html:not(.touch) .ch.focus,html:not(.touch) .cat.focus,html:not(.touch) .ep.focus,html:not(.touch) .mr.focus{background:linear-gradient(90deg,#0e6f86,#5b2a8e)}
+html:not(.touch) .mbox{box-shadow:0 20px 50px rgba(0,0,0,.6)}
+html:not(.touch) .moving .ch.sel,html:not(.touch) .moving .cat.sel,html:not(.touch) .moving .pc.sel{box-shadow:0 0 0 3px #ffb54a;transform:none}

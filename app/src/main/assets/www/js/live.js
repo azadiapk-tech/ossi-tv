@@ -13,6 +13,15 @@ var S = {
   retry: null, pick: null, loading: false
 };
 var Live = O.live = {};
+var infoT = 0, epgT = 0, epgPend = {};
+/* rows ask for their programme guide only after the list has stopped moving */
+function epgSoon(id) {
+  epgPend[id] = 1; clearTimeout(epgT);
+  epgT = setTimeout(function () {
+    var ids = Object.keys(epgPend); epgPend = {};
+    ids.forEach(function (x) { if (root && root.querySelector('[data-epg="' + x + '"]')) D.epg(x); });
+  }, 350);
+}
 var ARC = '<svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" fill="none" stroke="#67e8f9" stroke-width="2" stroke-linecap="round"/><path d="M4 4v4h4" fill="none" stroke="#67e8f9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4.5l3 2" fill="none" stroke="#67e8f9" stroke-width="2" stroke-linecap="round"/></svg>';
 O.onEpg = function (id, n) {
   if (!root) return;
@@ -91,7 +100,7 @@ function chRow(i) {
   var c = S.view[i], fav = O.fav.has('live', c.id), sel = S.edit && S.edit.sel[key(c)];
   var now = S.playing && key(S.playing) === key(c);
   var ep = D.epgNow(c.id), np = ep && ep.cur ? ep.cur.title : '';
-  if (!ep) D.epg(c.id);
+  if (!ep) epgSoon(c.id);
   return '<div class="ch' + (now ? ' now' : '') + (sel ? ' sel' : '') + '" data-i="' + i + '"><span class="no">' + (i + 1) + '</span>' + logo(c) +
     '<span class="chx"><span class="nm" dir="auto">' + esc(c.name) + '</span><span class="np" dir="auto" data-epg="' + esc(c.id) + '">' + esc(np) + '</span></span>' +
     (c.arch ? '<span class="arc" title="archive">' + ARC + '</span>' : '') +
@@ -519,7 +528,7 @@ Live.onKey = function (e, k) {
     else if (k === K.PGUP || k === K.CHDN) G.ch.page(-1);
     else if (k === K.PGDN || k === K.CHUP) G.ch.page(1);
     else used = false;
-    if (used && (k === K.UP || k === K.DOWN)) drawInfo();
+    if (used && (k === K.UP || k === K.DOWN)) { clearTimeout(infoT); infoT = setTimeout(drawInfo, 160); }
   } else if (a === 'preview') {
     if (k === K.LEFT) setArea('channels');
     else if (k === K.ENTER) { if (S.playing && Pl.st !== 'idle') enterFull(); }
