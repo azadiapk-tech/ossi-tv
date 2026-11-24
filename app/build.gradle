@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.ossi.iptv'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.ossi.iptv'
+        minSdk 21
+        targetSdk 34
+        versionCode((System.getenv('VERSION_CODE') ?: '5') as int)
+        versionName(System.getenv('VERSION_NAME') ?: '1.4')
+    }
+
+    // Fixed key so every new build installs as an update over the old one.
+    signingConfigs {
+        ossi {
+            storeFile file('ossi.keystore')
+            storePassword 'ossi1234'
+            keyAlias 'ossi'
+            keyPassword 'ossi1234'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.ossi
+        }
+        debug {
+            signingConfig signingConfigs.ossi
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    def media3 = '1.4.1'
+    implementation "androidx.media3:media3-exoplayer:$media3"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3"
+    implementation "androidx.media3:media3-ui:$media3"
+    implementation "androidx.annotation:annotation:1.8.2"
+    implementation "androidx.core:core:1.13.1"
+}

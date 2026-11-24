@@ -1,0 +1,52 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        run: |
+          echo "VERSION_CODE=$(( ($(date +%s) - 1767225600) / 60 ))" >> $GITHUB_ENV
+          echo "VERSION_NAME=1.4.$(TZ=Europe/Berlin date +%m%d.%H%M)" >> $GITHUB_ENV
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk OssiTV.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OssiIPTV-apk
+          path: OssiTV.apk
+
+      # Every build becomes a release: the app checks the latest one and updates itself.
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: b${{ env.VERSION_CODE }}
+          name: Ossi TV ${{ env.VERSION_NAME }}
+          body: ${{ github.event.head_commit.message }}
+          files: OssiTV.apk
+          make_latest: true
