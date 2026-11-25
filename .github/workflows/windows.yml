@@ -3,7 +3,7 @@ name: Build Windows
 on:
   push:
     branches: [main]
-    paths: ['app/src/main/assets/www/**', 'web/**', 'desktop/**', '.github/workflows/windows.yml']
+    paths: ['app/src/main/assets/www/**', 'desktop/**', '.github/workflows/windows.yml']
   workflow_dispatch:
 
 permissions:
@@ -43,7 +43,7 @@ jobs:
         working-directory: desktop
         run: |
           pip install pillow
-          OSSI_LIBS=node_modules python ../web/build.py app/index.html
+          OSSI_LIBS=node_modules python page.py app/index.html
 
       - name: Build installer
         working-directory: desktop
@@ -54,7 +54,7 @@ jobs:
           name: OssiTV-Windows
           path: |
             desktop/dist/OssiTV-Setup.exe
-            desktop/dist/OssiTV-Portable.exe
+            desktop/dist/latest.yml
 
       # Fixed tag "windows" -> the download link never changes. Not marked latest (the Android updater uses latest).
       - name: Release
@@ -62,7 +62,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete windows --yes --cleanup-tag || true
-          gh release create windows desktop/dist/OssiTV-Setup.exe desktop/dist/OssiTV-Portable.exe \
+          ls desktop/dist
+          gh release create windows desktop/dist/OssiTV-Setup.exe desktop/dist/OssiTV-Setup.exe.blockmap desktop/dist/latest.yml \
             --target "$GITHUB_SHA" --latest=false \
             --title "Ossi TV für Windows $VERSION_NAME" \
-            --notes "OssiTV-Setup.exe: installieren (Desktop-Symbol). OssiTV-Portable.exe: ohne Installation starten."
+            --notes "OssiTV-Setup.exe herunterladen und installieren. Die App aktualisiert sich danach selbst."

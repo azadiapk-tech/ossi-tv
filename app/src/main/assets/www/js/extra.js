@@ -3,6 +3,7 @@
 'use strict';
 var O = window.O, t = O.t, M = O.modal;
 var NAT = window.OssiNative || null;
+var DESK = window.OssiDesk || null;   /* Windows app */
 
 /* ================= sleep timer ================= */
 var SL = O.sleep = { end: 0, mins: 0 };
@@ -45,7 +46,7 @@ SL.menu = function () {
 /* ================= in-app update (GitHub releases) ================= */
 var U = O.upd = { busy: false };
 var REPO = (window.OSSI_CONFIG && OSSI_CONFIG.updateRepo) || '';
-U.available = function () { return !!(NAT && NAT.versionCode && REPO); };
+U.available = function () { return !!((NAT && NAT.versionCode && REPO) || (DESK && DESK.check)); };
 U.check = function (manual) {
   if (!U.available()) { if (manual) O.toast(t('updNA')); return; }
   if (!manual) {
@@ -54,6 +55,7 @@ U.check = function (manual) {
   }
   O.cfg.set('updChecked', Date.now());
   if (manual) O.toast(t('updChecking'));
+  if (DESK) { DESK.check(!!manual); return; }   /* Windows: answers come back through __ossiUpd */
   O.getJSON('https://api.github.com/repos/' + REPO + '/releases/latest', function (r) {
     var code = parseInt(String(r && r.tag_name || '').replace(/\D/g, ''), 10) || 0, mine = NAT.versionCode();
     var asset = null;
@@ -73,7 +75,16 @@ U.download = function (url) {
   NAT.downloadUpdate(url);
 };
 window.__ossiUpd = function (kind, n, txt) {
-  if (kind === 'prog') {
+  if (kind === 'avail') {                       /* Windows: a newer version exists (txt = version) */
+    M.open({ title: t('updTitle'), msg: 'Ossi TV ' + (txt || ''), rows: [
+      { label: t('updNow'), onOk: function () { M.close(); U.busy = true;
+          U.dlg = M.open({ title: t('updTitle'), msg: t('updDownloading') + ' 0%', rows: [{ label: t('hide'), onOk: function () { M.close(); } }] });
+          DESK.download(); } },
+      { label: t('later'), onOk: function () { M.close(); } }
+    ] });
+  } else if (kind === 'none') {
+    O.toast(t('updNone'));
+  } else if (kind === 'prog') {
     if (U.dlg && M.isOpen()) M.setMsg(t('updDownloading') + ' ' + (n >= 0 ? n + '%' : '…'));
   } else if (kind === 'perm') {
     U.busy = false; if (M.isOpen()) M.close();
@@ -153,23 +164,8 @@ function submit() {
   O.getJSON(host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p), okLogin, function (why) {
     done();
     why = String(why || '');
-    if (!/\bweb\b/.test(document.documentElement.className)) { lerr(t('loginNet')); return; }
-    /* the server DID answer, just not with a valid login reply */
-    if (/^HTTP/.test(why)) { lerr(t('loginSrv') + ' ' + why); return; }
-    /* browser: find out WHY it failed */
-    var proto = location.protocol;
-    if (/^(https|blob|data|about):$/.test(proto) && host.indexOf('http:') === 0) { lerr(t('loginOpenFile')); return; }
-    if (!window.fetch) { lerr(t('loginNetWeb')); return; }
-    var probe = host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p);
-    fetch(probe, { cache: 'no-store' })                        /* readable answer? then it is not CORS */
-      .then(function (r) { return r.text().then(function (s) {
-        try { var d = JSON.parse(s); if (d && d.user_info) { okLogin(d); return; } } catch (e) {}
-        s = s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
-        lerr(t('loginSrv') + ' HTTP ' + r.status + (s ? ': ' + s : ''));
-      }); })
-      .catch(function () { return fetch(host + '/player_api.php', { mode: 'no-cors', cache: 'no-store' })
-      .then(function () { lerr(t(/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? 'loginCorsMob' : 'loginCors')); })              /* server answered, but does not allow browsers */
-      .catch(function () { lerr(t('loginNoReach') + ' (' + why + ')'); }); });   /* server not reachable at all */
+    /* the server answered, but not with a login reply (e.g. HTTP 403): show what it said */
+    lerr(/^HTTP/.test(why) ? t('loginSrv') + ' ' + why : t('loginNet'));
   }, 1);
 }
 LG.show = function () {

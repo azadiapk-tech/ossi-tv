@@ -1,7 +1,8 @@
 /* Ossi TV for Windows: the same app as on Android, in its own window.
    The app talks to the IPTV server as an app (like the Android version),
    not as a web browser. */
-const { app, BrowserWindow, session, shell, Menu } = require('electron');
+const { app, BrowserWindow, session, shell, Menu, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 const UA = 'OssiTV/' + app.getVersion() + ' (Windows; Electron)';
@@ -25,6 +26,7 @@ function create() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: path.join(__dirname, 'preload.js'),
       webSecurity: false,          /* the page is our own local file; lets it read the IPTV server's answers */
       backgroundThrottling: false
     }
@@ -63,6 +65,29 @@ function create() {
   win.on('closed', () => { win = null; });
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
 }
+
+/* ---------- updates: same idea as on Android (GitHub release "windows") ---------- */
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+let manualCheck = false, downloading = false;
+function toPage(kind, n, txt) {
+  if (!win) return;
+  win.webContents.executeJavaScript('window.__ossiUpd && window.__ossiUpd(' + JSON.stringify(kind) + ',' + (+n || 0) + ',' + JSON.stringify(txt || '') + ')').catch(() => {});
+}
+function errText(e) { return String((e && e.message) || e || '').split('\n')[0].slice(0, 80); }
+autoUpdater.on('update-available', (i) => toPage('avail', 0, i && i.version));
+autoUpdater.on('update-not-available', () => { if (manualCheck) toPage('none'); });
+autoUpdater.on('download-progress', (p) => toPage('prog', Math.round(p.percent || 0)));
+autoUpdater.on('update-downloaded', () => { toPage('inst'); setTimeout(() => autoUpdater.quitAndInstall(true, true), 800); });
+autoUpdater.on('error', (e) => { if (manualCheck || downloading) toPage('err', 0, errText(e)); downloading = false; });
+ipcMain.on('ossi:version', (e) => { e.returnValue = app.getVersion(); });
+ipcMain.on('ossi:check', (e, manual) => {
+  manualCheck = !!manual;
+  if (!app.isPackaged) { if (manualCheck) toPage('none'); return; }
+  autoUpdater.checkForUpdates().catch((err) => { if (manualCheck) toPage('err', 0, errText(err)); });
+});
+ipcMain.on('ossi:download', () => { downloading = true; autoUpdater.downloadUpdate().catch(() => {}); });
+ipcMain.on('ossi:open', (e, url) => { if (/^https:\/\//i.test(url)) shell.openExternal(url); });
 
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 app.whenReady().then(create);

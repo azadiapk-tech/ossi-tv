@@ -373,7 +373,7 @@ var DT = O.detail = {};
       else { var last = O.store.p('lastEp.' + it.id, null); if (last && d.seasons[last.s] && d.seasons[last.s].eps[last.i]) playEp(last.s, last.i); else playEp(0, 0); }
     } else if (x.id === 'start') playMovie(true);
     else if (x.id === 'trailer') {
-      if (NAT && NAT.openUrl) NAT.openUrl(O.trailerUrl(d.trailer)); else O.toast(t('trailerNA'));
+      if (NAT && NAT.openUrl) NAT.openUrl(O.trailerUrl(d.trailer)); else if (window.OssiDesk) window.OssiDesk.openUrl(O.trailerUrl(d.trailer)); else O.toast(t('trailerNA'));
     } else if (x.id === 'fav') {
       var on = O.fav.toggle(favType(), slimItem(it)); O.toast(on ? t('favAdded') : t('favRemoved')); drawBtns();
     }

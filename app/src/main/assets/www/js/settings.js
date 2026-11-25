@@ -213,8 +213,8 @@ function togglePreview() {
 }
 function about() {
   var ui = D.info || {}, pl = O.pl, lines = [];
-  var NAT = window.OssiNative;
-  lines.push('Ossi TV  ' + (NAT && NAT.version ? 'v' + NAT.version() : 'v' + O.VERSION));
+  var NAT = window.OssiNative, DESK = window.OssiDesk;
+  lines.push('Ossi TV  ' + (NAT && NAT.version ? 'v' + NAT.version() : DESK && DESK.version ? 'v' + DESK.version + ' (Windows)' : 'v' + O.VERSION));
   lines.push(t('playlist') + ': ' + pl.name + '  (' + pl.host.replace(/^https?:\/\//, '') + ')');
   if (ui.status) lines.push(t('status') + ': ' + ui.status);
   var exp = parseInt(ui.exp_date, 10);

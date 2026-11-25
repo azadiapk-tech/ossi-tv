@@ -7,25 +7,41 @@
   "main": "main.js",
   "private": true,
   "scripts": {
-    "page": "python ../web/build.py app/index.html",
+    "page": "python page.py app/index.html",
     "dist": "electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "electron": "latest",
-    "electron-builder": "latest"
-  },
-  "dependencies": {
+    "electron-builder": "latest",
     "hls.js": "1.5.17",
     "mpegts.js": "1.7.3"
+  },
+  "dependencies": {
+    "electron-updater": "latest"
   },
   "build": {
     "appId": "com.azadiapk.ossitv",
     "productName": "Ossi TV",
-    "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["main.js", "app/**/*", "build/icon.png"],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "build/icon.png"
+    ],
     "win": {
       "icon": "build/icon.ico",
-      "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": true,
@@ -35,6 +51,11 @@
       "shortcutName": "Ossi TV",
       "artifactName": "OssiTV-Setup.${ext}"
     },
-    "portable": { "artifactName": "OssiTV-Portable.${ext}" }
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/azadiapk-tech/ossi-tv/releases/download/windows"
+      }
+    ]
   }
 }
