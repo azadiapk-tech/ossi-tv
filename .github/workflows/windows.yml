@@ -31,7 +31,7 @@ jobs:
       - name: Version
         run: |
           echo "VERSION_CODE=$(( ($(date +%s) - 1767225600) / 60 ))" >> $GITHUB_ENV
-          echo "VERSION_NAME=1.4.$(TZ=Europe/Berlin date +%m%d.%H%M)" >> $GITHUB_ENV
+          echo "VERSION_NAME=1.4.$(date -u -d "+1 hour" +%m%d.%H%M)" >> $GITHUB_ENV
 
       - name: Install
         working-directory: desktop
