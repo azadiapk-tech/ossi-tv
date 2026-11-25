@@ -139,7 +139,7 @@ function submit() {
   var host = O.fixedHost() || (O.pl && O.pl.host) || '';
   busy = true; lerr(''); lq('lgGo').classList.add('busy'); lq('lgGo').textContent = t('loginWait');
   function done() { busy = false; lq('lgGo').classList.remove('busy'); lq('lgGo').textContent = t('loginBtn'); }
-  O.getJSON(host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p), function (d) {
+  function okLogin(d) {
     done();
     var ui = d && d.user_info;
     if (!ui || +ui.auth !== 1) { lerr(t('loginBad')); return; }
@@ -149,16 +149,27 @@ function submit() {
     l.forEach(function (x) { if (x.id === O.pl.id) { x.host = host; x.user = u; x.pass = p; if (!x.name || x.name === 'Ossi') x.name = u; } });
     O.plSave(l);
     O.app.switchPlaylist(O.pl.id);
-  }, function () {
+  }
+  O.getJSON(host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p), okLogin, function (why) {
     done();
+    why = String(why || '');
     if (!/\bweb\b/.test(document.documentElement.className)) { lerr(t('loginNet')); return; }
+    /* the server DID answer, just not with a valid login reply */
+    if (/^HTTP/.test(why)) { lerr(t('loginSrv') + ' ' + why); return; }
     /* browser: find out WHY it failed */
     var proto = location.protocol;
     if (/^(https|blob|data|about):$/.test(proto) && host.indexOf('http:') === 0) { lerr(t('loginOpenFile')); return; }
     if (!window.fetch) { lerr(t('loginNetWeb')); return; }
-    fetch(host + '/player_api.php', { mode: 'no-cors', cache: 'no-store' })
+    var probe = host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p);
+    fetch(probe, { cache: 'no-store' })                        /* readable answer? then it is not CORS */
+      .then(function (r) { return r.text().then(function (s) {
+        try { var d = JSON.parse(s); if (d && d.user_info) { okLogin(d); return; } } catch (e) {}
+        s = s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+        lerr(t('loginSrv') + ' HTTP ' + r.status + (s ? ': ' + s : ''));
+      }); })
+      .catch(function () { return fetch(host + '/player_api.php', { mode: 'no-cors', cache: 'no-store' })
       .then(function () { lerr(t(/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? 'loginCorsMob' : 'loginCors')); })              /* server answered, but does not allow browsers */
-      .catch(function () { lerr(t('loginNoReach')); });         /* server not reachable at all */
+      .catch(function () { lerr(t('loginNoReach') + ' (' + why + ')'); }); });   /* server not reachable at all */
   }, 1);
 }
 LG.show = function () {

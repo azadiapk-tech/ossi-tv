@@ -876,6 +876,7 @@ var T = {
   loginOpenFile: ['هذه الصفحة مفتوحة داخل تطبيق يمنع الاتصال. احفظ الملف على الجهاز وافتحه من تطبيق الملفات بمتصفح (Samsung Internet أو Chrome)، أو على الكمبيوتر بدبل كليك', 'This page is open inside an app that blocks connections. Save the file on a computer and double-click it in Chrome', 'Diese Seite läuft in einer App, die Verbindungen blockiert. Datei am PC speichern und in Chrome per Doppelklick öffnen'],
   loginCors: ['السيرفر يعمل لكنه يمنع المتصفحات (CORS). افتح التطبيق عبر ملف "Ossi TV starten.bat"', 'The server works but blocks browsers (CORS). Open the app with "Ossi TV starten.bat"', 'Der Server läuft, blockiert aber Browser (CORS). App über "Ossi TV starten.bat" öffnen'],
   loginCorsMob: ['السيرفر يعمل لكنه يمنع المتصفحات (CORS). على الموبايل استخدم تطبيق Ossi TV، أو جرّب على كمبيوتر عبر ملف "Ossi TV starten.bat"', 'The server works but blocks browsers (CORS). On a phone use the Ossi TV app, or on a PC use "Ossi TV starten.bat"', 'Der Server läuft, blockiert aber Browser (CORS). Am Handy die Ossi-TV-App nutzen, am PC "Ossi TV starten.bat"'],
+  loginSrv: ['السيرفر رد بشكل غير متوقع:', 'The server gave an unexpected answer:', 'Unerwartete Antwort vom Server:'],
   loginNoReach: ['لا يمكن الوصول للسيرفر: تحقق من الإنترنت، أو أن هذا المتصفح يمنع الاتصال', 'Server not reachable: check the internet, or this browser blocks the connection', 'Server nicht erreichbar: Internet prüfen oder dieser Browser blockiert die Verbindung'],
   loginNetWeb: ['تعذر الاتصال بالسيرفر من المتصفح: إما الإنترنت، أو السيرفر لا يسمح للمتصفحات (CORS)', 'The browser cannot reach the server: check the internet, or the server blocks browsers (CORS)', 'Browser erreicht den Server nicht: Internet prüfen oder Server blockiert Browser (CORS)'],
   logoutMsg: ['سيتم الرجوع إلى شاشة تسجيل الدخول', 'You will return to the sign-in screen', 'Zurück zum Anmeldebildschirm'],
@@ -1089,6 +1090,7 @@ O.getJSON = function (url, ok, fail, tries) {
   var ctl = { x: null, dead: false, abort: function () { ctl.dead = true; try { ctl.x.abort(); } catch (e) {} } };
   (function attempt(n) {
     var x = new XMLHttpRequest(), fin = false;
+    function snip(r) { var s = String(r.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); return s ? ': ' + s.slice(0, 120) : ''; }
     ctl.x = x;
     function bad(msg) {
       if (fin || ctl.dead) return; fin = true;
@@ -1099,12 +1101,12 @@ O.getJSON = function (url, ok, fail, tries) {
     x.timeout = 60000;
     x.onload = function () {
       if (fin || ctl.dead) return;
-      if (x.status < 200 || x.status >= 300) { bad('HTTP ' + x.status); return; }
+      if (x.status < 200 || x.status >= 300) { bad('HTTP ' + x.status + snip(x)); return; }
       var d;
-      try { d = JSON.parse(x.responseText); } catch (e) { bad('bad JSON'); return; }
+      try { d = JSON.parse(x.responseText); } catch (e) { bad('HTTP ' + x.status + ' (no JSON)' + snip(x)); return; }
       fin = true; ok(d);
     };
-    x.onerror = function () { bad('network'); };
+    x.onerror = function () { bad(x.status ? 'HTTP ' + x.status : 'network'); };
     x.ontimeout = function () { bad('timeout'); };
     x.send();
   })(tries == null ? 2 : tries);
@@ -3999,7 +4001,7 @@ function submit() {
   var host = O.fixedHost() || (O.pl && O.pl.host) || '';
   busy = true; lerr(''); lq('lgGo').classList.add('busy'); lq('lgGo').textContent = t('loginWait');
   function done() { busy = false; lq('lgGo').classList.remove('busy'); lq('lgGo').textContent = t('loginBtn'); }
-  O.getJSON(host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p), function (d) {
+  function okLogin(d) {
     done();
     var ui = d && d.user_info;
     if (!ui || +ui.auth !== 1) { lerr(t('loginBad')); return; }
@@ -4009,16 +4011,27 @@ function submit() {
     l.forEach(function (x) { if (x.id === O.pl.id) { x.host = host; x.user = u; x.pass = p; if (!x.name || x.name === 'Ossi') x.name = u; } });
     O.plSave(l);
     O.app.switchPlaylist(O.pl.id);
-  }, function () {
+  }
+  O.getJSON(host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p), okLogin, function (why) {
     done();
+    why = String(why || '');
     if (!/\bweb\b/.test(document.documentElement.className)) { lerr(t('loginNet')); return; }
+    /* the server DID answer, just not with a valid login reply */
+    if (/^HTTP/.test(why)) { lerr(t('loginSrv') + ' ' + why); return; }
     /* browser: find out WHY it failed */
     var proto = location.protocol;
     if (/^(https|blob|data|about):$/.test(proto) && host.indexOf('http:') === 0) { lerr(t('loginOpenFile')); return; }
     if (!window.fetch) { lerr(t('loginNetWeb')); return; }
-    fetch(host + '/player_api.php', { mode: 'no-cors', cache: 'no-store' })
+    var probe = host + '/player_api.php?username=' + O.enc(u) + '&password=' + O.enc(p);
+    fetch(probe, { cache: 'no-store' })                        /* readable answer? then it is not CORS */
+      .then(function (r) { return r.text().then(function (s) {
+        try { var d = JSON.parse(s); if (d && d.user_info) { okLogin(d); return; } } catch (e) {}
+        s = s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+        lerr(t('loginSrv') + ' HTTP ' + r.status + (s ? ': ' + s : ''));
+      }); })
+      .catch(function () { return fetch(host + '/player_api.php', { mode: 'no-cors', cache: 'no-store' })
       .then(function () { lerr(t(/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? 'loginCorsMob' : 'loginCors')); })              /* server answered, but does not allow browsers */
-      .catch(function () { lerr(t('loginNoReach')); });         /* server not reachable at all */
+      .catch(function () { lerr(t('loginNoReach') + ' (' + why + ')'); }); });   /* server not reachable at all */
   }, 1);
 }
 LG.show = function () {

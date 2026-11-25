@@ -132,6 +132,7 @@ O.getJSON = function (url, ok, fail, tries) {
   var ctl = { x: null, dead: false, abort: function () { ctl.dead = true; try { ctl.x.abort(); } catch (e) {} } };
   (function attempt(n) {
     var x = new XMLHttpRequest(), fin = false;
+    function snip(r) { var s = String(r.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); return s ? ': ' + s.slice(0, 120) : ''; }
     ctl.x = x;
     function bad(msg) {
       if (fin || ctl.dead) return; fin = true;
@@ -142,12 +143,12 @@ O.getJSON = function (url, ok, fail, tries) {
     x.timeout = 60000;
     x.onload = function () {
       if (fin || ctl.dead) return;
-      if (x.status < 200 || x.status >= 300) { bad('HTTP ' + x.status); return; }
+      if (x.status < 200 || x.status >= 300) { bad('HTTP ' + x.status + snip(x)); return; }
       var d;
-      try { d = JSON.parse(x.responseText); } catch (e) { bad('bad JSON'); return; }
+      try { d = JSON.parse(x.responseText); } catch (e) { bad('HTTP ' + x.status + ' (no JSON)' + snip(x)); return; }
       fin = true; ok(d);
     };
-    x.onerror = function () { bad('network'); };
+    x.onerror = function () { bad(x.status ? 'HTTP ' + x.status : 'network'); };
     x.ontimeout = function () { bad('timeout'); };
     x.send();
   })(tries == null ? 2 : tries);
