@@ -149,7 +149,7 @@ function submit() {
     l.forEach(function (x) { if (x.id === O.pl.id) { x.host = host; x.user = u; x.pass = p; if (!x.name || x.name === 'Ossi') x.name = u; } });
     O.plSave(l);
     O.app.switchPlaylist(O.pl.id);
-  }, function () { done(); lerr(t('loginNet')); }, 1);
+  }, function () { done(); lerr(t(/\bweb\b/.test(document.documentElement.className) ? 'loginNetWeb' : 'loginNet')); }, 1);
 }
 LG.show = function () {
   if (!lbuilt) lbuild();

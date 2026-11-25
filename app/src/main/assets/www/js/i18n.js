@@ -123,6 +123,7 @@ var T = {
   loginBad: ['اسم المستخدم أو كلمة المرور غير صحيحة', 'Wrong username or password', 'Benutzername oder Passwort falsch'],
   loginNet: ['تعذر الاتصال بالسيرفر، تحقق من الإنترنت', 'Cannot reach the server, check the internet', 'Server nicht erreichbar, Internet prüfen'],
   logout: ['تسجيل الخروج', 'Sign out', 'Abmelden'],
+  loginNetWeb: ['تعذر الاتصال بالسيرفر من المتصفح: إما الإنترنت، أو السيرفر لا يسمح للمتصفحات (CORS)', 'The browser cannot reach the server: check the internet, or the server blocks browsers (CORS)', 'Browser erreicht den Server nicht: Internet prüfen oder Server blockiert Browser (CORS)'],
   logoutMsg: ['سيتم الرجوع إلى شاشة تسجيل الدخول', 'You will return to the sign-in screen', 'Zurück zum Anmeldebildschirm'],
   expiresOn: ['ينتهي', 'Expires', 'Läuft ab'],
   subUnlimited: ['اشتراك غير محدود', 'Unlimited subscription', 'Unbegrenztes Abo'],
