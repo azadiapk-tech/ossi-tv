@@ -149,7 +149,7 @@ document.addEventListener('click', function (e) {
 
 /* ---------- fullscreen player overlays ---------- */
 var Pui = O.pui = { active: false, kind: null, h: null };
-var NAT = window.OssiNative || null, briSet = false, NU = null;
+var NAT = window.OssiNative || window.OssiVB || null, briSet = false, NU = null;   /* OssiVB: Windows volume/brightness */
 var infoT = 0, barT = 0, vodTitle = '', vodSub = '', seekShow = null;
 function ctl(on) {
   var c = $('pCtl'); if (!c) return;
@@ -274,6 +274,13 @@ function buildCtl() {
     gestInd(gs.mode, v);
   }, { passive: false });
   tl.addEventListener('touchend', function (e) { if (!e.touches.length) gs = null; });
+  /* mouse wheel over the picture = volume (Windows) */
+  pl.addEventListener('wheel', function (e) {
+    if (!Pui.active || !slOk()) return;
+    e.preventDefault();
+    var v = O.clamp(NAT.getVolume() + (e.deltaY < 0 ? 0.05 : -0.05), 0, 1);
+    NAT.setVolume(v); gestInd('vol', v);
+  }, { passive: false });
   /* drag on a bar */
   function slTouch(e) {
     var tr = e.target.closest && e.target.closest('.sl-tr'); if (!tr) return;

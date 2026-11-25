@@ -551,3 +551,7 @@ html:not(.touch) .pc.focus .pi,html:not(.touch) .cc.focus .ci{box-shadow:0 0 0 4
 html:not(.touch) .ch.focus,html:not(.touch) .cat.focus,html:not(.touch) .ep.focus,html:not(.touch) .mr.focus{background:linear-gradient(90deg,#0e6f86,#5b2a8e)}
 html:not(.touch) .mbox{box-shadow:0 20px 50px rgba(0,0,0,.6)}
 html:not(.touch) .moving .ch.sel,html:not(.touch) .moving .cat.sel,html:not(.touch) .moving .pc.sel{box-shadow:0 0 0 3px #ffb54a;transform:none}
+/* v1.7: drag in poster grids (vertical drop marker) + no text selection while holding the mouse */
+.vdrop.vcol{background:linear-gradient(180deg,#22d3ee,#d946ef)}
+.vg{-webkit-user-select:none;user-select:none}
+.vg img{-webkit-user-drag:none}

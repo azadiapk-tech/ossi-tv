@@ -129,11 +129,28 @@ function boot() {
   scr = { login: O.login, home: O.home, live: O.live, movies: O.movies, series: O.series, detail: O.detail, settings: O.settings, multi: O.multi };
   O.plInit(); fit(); registerKeys();
   document.documentElement.lang = O.lang();
-  D.loadInfo(null, null);
+  /* a fresh start always loads fresh data; the account info is retried if the first try fails */
+  D.loadInfo(null, function () { setTimeout(function () { if (!D.info) D.loadInfo(null, null); }, 5000); });
   O.app.go(O.needsSetup() ? 'login' : 'home');
   hideSplash();
   setTimeout(function () { if (!O.needsSetup() && O.upd) O.upd.check(false); }, 1500);
 }
+/* ---------- coming back to the app after a while: refresh the subscription data once ----------
+   (phones and the Fire TV keep the app alive in the background, so "opening" it is often just a return) */
+var hiddenAt = 0, lastAuto = 0;
+O.app.autoRefresh = function (awayMs) {
+  if (!scr || O.needsSetup() || awayMs < 5 * 60000 || Date.now() - lastAuto < 60000) return;
+  lastAuto = Date.now();
+  var busy = (O.pui && O.pui.active) || (Pl.st && Pl.st !== 'idle') || cur === 'detail' || cur === 'login' || (O.modal && O.modal.isOpen && O.modal.isOpen());
+  if (busy) { D.loadInfo(null, null); return; }      /* never interrupt what is on screen: only the account info */
+  O.app.reload(); O.toast(t('updated'));
+};
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (hiddenAt) { var away = Date.now() - hiddenAt; hiddenAt = 0; O.app.autoRefresh(away); }
+});
+window.__ossiResume = function (awayMs) { O.app.autoRefresh(+awayMs || 0); };   /* sent by the Android app */
+
 document.addEventListener('keydown', onKey);
 O.app.key = function (code) { onKey({ keyCode: code, which: code, preventDefault: function () {} }); };
 document.addEventListener('click', function (e) {

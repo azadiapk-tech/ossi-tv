@@ -185,6 +185,8 @@ public class MainActivity extends Activity {
         }
     }
 
+    private long stoppedAt = 0;
+
     @Override
     protected void onPause() {
         super.onPause();
@@ -196,12 +198,18 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (web != null) web.onResume();
+        if (stoppedAt > 0 && web != null) {      // back from the background: let the app refresh the subscription data
+            long away = android.os.SystemClock.elapsedRealtime() - stoppedAt;
+            stoppedAt = 0;
+            web.evaluateJavascript("window.__ossiResume&&window.__ossiResume(" + away + ")", null);
+        }
         hideSystemBars();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
+        stoppedAt = android.os.SystemClock.elapsedRealtime();
         if (web != null) web.onPause();
         if (players != null) players.stopAll();
     }

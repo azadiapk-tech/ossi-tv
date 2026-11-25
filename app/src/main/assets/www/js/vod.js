@@ -59,10 +59,15 @@ function makeVod(type, rootId) {
       '<div class="sbox vcs" style="left:20px;top:140px;width:520px">' + O.ic.search + '<input class="vc" placeholder="' + esc(t('searchCat')) + '"></div>' +
       '<div class="lv-list vd-cats"></div><div class="lv-list vd-grid"></div>' +
       '<div class="hints"><span><i class="kd w"></i>OK</span><span><i class="kd y"></i>' + esc(t('hFav')) + '</span><span>☰  ' + esc(t('eTitle2')) + '</span></div>' +
-      '<div class="editbar hidden vd-edit"></div>';
+      '<div class="editbar hidden vd-edit"></div>' +
+      '<div class="editbar tbar hidden vd-editT"><span class="et" dir="auto">' + esc(t('eTouch')) + '</span>' +
+      '<b class="ebtn vd-edReset">' + esc(t('resetOrder')) + '</b><b class="ebtn on vd-edDone">' + esc(t('eDone')) + '</b></div>';
     G.cats = new O.VGrid(q('.vd-cats'), {
       cols: 1, itemH: 74, gap: 8, render: catRow, count: function () { return S.catView.length; },
-      onClick: function (i) { if (S.edit) { if (S.edit.area === 'cats' && S.edit.mode === 'select') eToggle(i); return; } setArea('cats'); onCatOk(); }
+      onClick: function (i) { if (S.edit) { if (S.edit.area === 'cats' && S.edit.mode === 'select') eToggle(i); return; } setArea('cats'); onCatOk(); },
+      onLong: function (i) { tLong('cats', i); },
+      onDragStart: function (i) { return tDrag('cats', i); },
+      onDrop: function (slot) { tDrop(slot); }
     });
     G.grid = new O.VGrid(q('.vd-grid'), {
       cols: 5 + Math.round((O.stageX || 0) / 263), itemH: 420, gap: 16, render: card, count: function () { return S.view.length; },
@@ -70,8 +75,13 @@ function makeVod(type, rootId) {
         if (S.edit) { if (S.edit.area === 'grid' && S.edit.mode === 'select') eToggle(i); return; }
         setArea('grid');
         if (e.target.closest && e.target.closest('.hrt')) toggleFav(S.view[i]); else activate(i);
-      }
+      },
+      onLong: function (i) { tLong('grid', i); },
+      onDragStart: function (i) { return tDrag('grid', i); },
+      onDrop: function (slot) { tDrop(slot); }
     });
+    q('.vd-edDone').onclick = function () { if (S.edit) { if (S.edit.dirty) eSave(); else eExit(); } };
+    q('.vd-edReset').onclick = function () { if (S.edit) eReset(); };
     root.addEventListener('click', function (e) {
       var g = e.target.closest && e.target.closest('[data-go]');
       if (g) O.app.go(g.getAttribute('data-go'));
@@ -158,7 +168,12 @@ function makeVod(type, rootId) {
   function eArr() { return S.edit.area === 'grid' ? S.all : S.cats.slice(PS); }
   function eGrid() { return S.edit.area === 'grid' ? G.grid : G.cats; }
   function eBase() { return S.edit.area === 'grid' ? 0 : PS; }
-  function eBar() { var b = q('.vd-edit'); b.innerHTML = S.edit ? O.editBarHtml(S.edit.mode) : ''; b.classList.toggle('hidden', !S.edit); }
+  function eBar() {
+    var b = q('.vd-edit'), tb = q('.vd-editT'), touch = O.isTouch();
+    b.innerHTML = S.edit ? O.editBarHtml(S.edit.mode) : '';
+    b.classList.toggle('hidden', !S.edit || touch); tb.classList.toggle('hidden', !S.edit || !touch);
+    q('.hints').style.display = S.edit ? 'none' : '';
+  }
   function eDraw() { G.grid.draw(); G.cats.draw(); }
   function editStart(selectCur) {
     var a = S.area;
@@ -208,6 +223,34 @@ function makeVod(type, rootId) {
     eExit(); O.toast(t('orderSaved'));
   }
   function eCancel() { eWrite(S.edit.orig.slice()); eExit(); }
+  function eReset() {
+    O.modal.confirm(t('resetOrder'), t('resetOrderMsg'), function () {
+      var area = S.edit.area; eExit();
+      if (area === 'grid') { O.store.pd('order.' + type + '.' + S.cur.id); loadList(S.cur, false); }
+      else { O.store.pd('order.cats.' + type); buildCats(); G.cats.reset(); G.cats.draw(); }
+      O.toast(t('orderReset'));
+    }, null, true);
+  }
+  /* ----- touch / mouse: hold = select (enters edit), tap = (de)select, hold a selected one = drag, release = drop + save ----- */
+  function tLong(area, i) {
+    if (S.edit) return;
+    setArea(area); (area === 'grid' ? G.grid : G.cats).cur = i;
+    editStart(true);
+  }
+  function tDrag(area, i) {
+    var E = S.edit; if (!E || E.area !== area || E.mode !== 'select') return false;
+    var c = eArr()[i - eBase()]; if (!c) return false;
+    if (!E.sel[String(c.id)]) { E.sel[String(c.id)] = 1; eDraw(); }
+    return true;
+  }
+  function tDrop(slot) {
+    var E = S.edit; if (!E || !Object.keys(E.sel).length) return;
+    var arr = eArr(), sl = O.clamp(slot - eBase(), 0, arr.length), block = [], rest = [], before = 0;
+    arr.forEach(function (x, i) { if (E.sel[String(x.id)]) block.push(x); else { rest.push(x); if (i < sl) before++; } });
+    eWrite(rest.slice(0, before).concat(block, rest.slice(before)));
+    E.sel = {}; E.dirty = true;
+    eSave();
+  }
   scr.canLongOk = function () { return !S.edit && (S.area === 'grid' || S.area === 'cats'); };
   scr.onLongOk = function () { editStart(true); };
 

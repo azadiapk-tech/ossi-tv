@@ -103,60 +103,83 @@ VGrid.prototype.move = function (dx, dy) {
 VGrid.prototype.page = function (dir) { this.setCur(this.cur + dir * this.cols * this.vis()); };
 VGrid.prototype.currentEl = function () { return this.el.querySelector('[data-i="' + this.cur + '"]'); };
 
-/* ---------------- touch: long-press + drag & drop (scrolling itself is native) ---------------- */
+/* ---------------- touch + mouse: long-press + drag & drop (scrolling itself is native) ----------------
+   Phone: hold a finger.  Windows: hold the left mouse button.  Lists (1 column) and poster grids (several columns). */
 function bindTouch(g) {
-  var el = g.el, st = null, lpT = 0, sup = false, drag = null;
+  var el = g.el, st = null, lpT = 0, sup = false, supT = 0, drag = null;
 
-  el.addEventListener('touchstart', function (e) {
-    sup = false; clearTimeout(lpT);
-    if (e.touches.length !== 1) { st = null; return; }
-    var t = e.touches[0], it = itemIndex(el, e.target);
-    st = { x: t.clientX, y: t.clientY, sc: el.scrollTop, target: e.target };
+  function begin(x, y, target) {
+    sup = false; clearTimeout(lpT); clearTimeout(supT);
+    var it = itemIndex(el, target);
+    st = { x: x, y: y, sc: el.scrollTop, target: target };
     if (it !== null && (g.onLong || g.onDragStart)) {
       lpT = setTimeout(function () {
         if (!st || Math.abs(el.scrollTop - st.sc) > 2) return;
-        sup = true;
+        sup = true;                                    /* the click that follows the release is swallowed */
         try { if (navigator.vibrate) navigator.vibrate(25); } catch (x) {}
-        if (g.onDragStart && g.onDragStart(it)) startDrag(it, st.y, st.target);
+        if (g.onDragStart && g.onDragStart(it)) startDrag(it, st.x, st.y, st.target);
         else if (g.onLong) g.onLong(it);
       }, 500);
     }
-  }, { passive: true });
-
-  el.addEventListener('touchmove', function (e) {
-    if (drag) { e.preventDefault(); return; }
-    if (!st) return;
-    var t = e.touches[0];
-    if (Math.abs(t.clientY - st.y) > 10 || Math.abs(t.clientX - st.x) > 10) { clearTimeout(lpT); st = null; }
-  }, { passive: false });
-
+  }
+  function moved(x, y) {
+    if (st && (Math.abs(y - st.y) > 10 || Math.abs(x - st.x) > 10)) { clearTimeout(lpT); st = null; }
+  }
   function end() {
     clearTimeout(lpT);
     if (drag) { finishDrag(); sup = true; }
+    if (sup) { clearTimeout(supT); supT = setTimeout(function () { sup = false; }, 450); }
     st = null;
   }
-  /* safety: never keep auto-scrolling once no finger is on the screen */
-  window.addEventListener('touchend', function (e) { if (drag && (!e.touches || !e.touches.length)) { finishDrag(); sup = true; } }, true);
+
+  /* touch */
+  el.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { st = null; clearTimeout(lpT); return; }
+    var t = e.touches[0]; begin(t.clientX, t.clientY, e.target);
+  }, { passive: true });
+  el.addEventListener('touchmove', function (e) {
+    if (drag) { e.preventDefault(); return; }
+    var t = e.touches[0]; moved(t.clientX, t.clientY);
+  }, { passive: false });
   el.addEventListener('touchend', end);
   el.addEventListener('touchcancel', end);
+  /* safety: never keep auto-scrolling once no finger is on the screen */
+  window.addEventListener('touchend', function (e) { if (drag && (!e.touches || !e.touches.length)) end(); }, true);
+
+  /* mouse (Windows): holding the left button = long-press */
+  var lastTouch = 0;
+  el.addEventListener('touchstart', function () { lastTouch = Date.now(); }, { passive: true });
+  el.addEventListener('mousedown', function (e) {
+    if (e.button !== 0 || drag || Date.now() - lastTouch < 800) return;   /* ignore the mouse events a phone fakes after a tap */
+    begin(e.clientX, e.clientY, e.target);
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (drag && drag.mouse) { e.preventDefault(); drag.x = e.clientX; drag.y = e.clientY; place(); return; }
+    if (Date.now() - lastTouch > 800) moved(e.clientX, e.clientY);
+  });
+  document.addEventListener('mouseup', function (e) { if (e.button === 0 && Date.now() - lastTouch > 800 && (st || drag || sup)) end(); });
+  el.addEventListener('dragstart', function (e) { e.preventDefault(); });   /* no browser image dragging */
+
   el.addEventListener('scroll', function () { if (!drag) clearTimeout(lpT); }, { passive: true });
   el.addEventListener('click', function (e) { if (sup) { e.stopPropagation(); e.preventDefault(); sup = false; } }, true);
   el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-  function dMove(e) { if (!drag) return; e.preventDefault(); if (e.touches && e.touches[0]) { drag.y = e.touches[0].clientY; place(); } }
-  function dEnd() { if (drag) { finishDrag(); sup = true; } }
-  function startDrag(i, y, target) {
+  function dMove(e) { if (!drag) return; e.preventDefault(); if (e.touches && e.touches[0]) { drag.x = e.touches[0].clientX; drag.y = e.touches[0].clientY; place(); } }
+  function dEnd() { if (drag) end(); }
+  function colW() { return (el.clientWidth + g.gap) / g.cols; }
+  function startDrag(i, x, y, target) {
     var host = el.parentNode, src = null, t = target;
     while (t && t !== el && !(t.getAttribute && t.getAttribute('data-i') !== null)) t = t.parentNode;
     if (t && t !== el && t.parentNode) src = t; else src = el.querySelector('[data-i="' + i + '"]');
-    drag = { i: i, y: y, slot: i, timer: 0, ind: document.createElement('div'), ghost: null };
-    drag.ind.className = 'vdrop';
+    drag = { i: i, x: x, y: y, slot: i, timer: 0, ind: document.createElement('div'), ghost: null, mouse: Date.now() - lastTouch > 800 };
+    drag.ind.className = 'vdrop' + (g.cols > 1 ? ' vcol' : '');
     host.appendChild(drag.ind);
     if (src && src.parentNode) {
       src.parentNode.replaceChild(src.cloneNode(true), src);      /* a copy stays in the list */
       src.removeAttribute('data-i');
       src.className += ' vghost';
-      src.style.position = 'absolute'; src.style.left = el.offsetLeft + 'px'; src.style.width = el.clientWidth + 'px'; src.style.height = g.itemH + 'px';
+      src.style.position = 'absolute'; src.style.left = el.offsetLeft + 'px'; src.style.height = g.itemH + 'px';
+      src.style.width = (g.cols > 1 ? colW() - g.gap : el.clientWidth) + 'px';
       host.appendChild(src); drag.ghost = src;                     /* the real touched node moves with the finger */
     }
     document.addEventListener('touchmove', dMove, { passive: false });
@@ -167,15 +190,32 @@ function bindTouch(g) {
     drag.timer = setInterval(autoScroll, 16);
     place();
   }
-  function yIn() { var r = el.getBoundingClientRect(); return (drag.y - r.top) / ((r.height / (el.offsetHeight || 1)) || 1); }
+  function scale() { var r = el.getBoundingClientRect(); return { r: r, s: (r.height / (el.offsetHeight || 1)) || 1 }; }
+  function yIn() { var q = scale(); return (drag.y - q.r.top) / q.s; }
+  function xIn() { var q = scale(); return (drag.x - q.r.left) / q.s; }
   function place() {
     if (!drag) return;
-    var y = yIn(), R = g.R(), n = g.count();
-    var slot = O.clamp(Math.round((y + el.scrollTop) / R), 0, Math.ceil(n / g.cols)) * g.cols;
-    drag.slot = Math.min(slot, n);
-    drag.ind.style.left = el.offsetLeft + 'px'; drag.ind.style.width = el.clientWidth + 'px';
-    drag.ind.style.top = (el.offsetTop + (drag.slot / g.cols) * R - el.scrollTop - g.gap / 2 - 3) + 'px';
-    if (drag.ghost) drag.ghost.style.top = (el.offsetTop + O.clamp(y, 0, el.clientHeight) - g.itemH / 2) + 'px';
+    var y = yIn(), R = g.R(), n = g.count(), cols = g.cols;
+    if (cols === 1) {
+      var slot = O.clamp(Math.round((y + el.scrollTop) / R), 0, n);
+      drag.slot = Math.min(slot, n);
+      drag.ind.style.left = el.offsetLeft + 'px'; drag.ind.style.width = el.clientWidth + 'px';
+      drag.ind.style.top = (el.offsetTop + drag.slot * R - el.scrollTop - g.gap / 2 - 3) + 'px';
+      if (drag.ghost) drag.ghost.style.top = (el.offsetTop + O.clamp(y, 0, el.clientHeight) - g.itemH / 2) + 'px';
+      return;
+    }
+    /* poster grid: drop BEFORE the poster under the pointer (or after the last one of a row) */
+    var x = O.clamp(xIn(), 0, el.clientWidth), cw = colW(), rows = Math.max(1, Math.ceil(n / cols));
+    var row = O.clamp(Math.floor((O.clamp(y, 0, el.clientHeight - 1) + el.scrollTop) / R), 0, rows - 1);
+    var col = O.clamp(Math.round(x / cw), 0, cols);
+    if (row * cols + col > n) col = n - row * cols;
+    drag.slot = row * cols + col;
+    drag.ind.style.left = (el.offsetLeft + col * cw - g.gap / 2 - 3) + 'px'; drag.ind.style.width = '6px';
+    drag.ind.style.top = (el.offsetTop + row * R - el.scrollTop) + 'px'; drag.ind.style.height = g.itemH + 'px';
+    if (drag.ghost) {
+      drag.ghost.style.left = (el.offsetLeft + x - (cw - g.gap) / 2) + 'px';
+      drag.ghost.style.top = (el.offsetTop + O.clamp(y, 0, el.clientHeight) - g.itemH / 2) + 'px';
+    }
   }
   /* gentle auto-scroll: only after the finger rests ~0.3s near the edge; speed grows with depth (max ~6 rows/s) */
   function autoScroll() {
