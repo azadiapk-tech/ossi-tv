@@ -154,10 +154,10 @@ function submit() {
     if (!/\bweb\b/.test(document.documentElement.className)) { lerr(t('loginNet')); return; }
     /* browser: find out WHY it failed */
     var proto = location.protocol;
-    if (proto !== 'file:' && proto !== 'http:' && host.indexOf('http:') === 0) { lerr(t('loginOpenFile')); return; }
+    if (/^(https|blob|data|about):$/.test(proto) && host.indexOf('http:') === 0) { lerr(t('loginOpenFile')); return; }
     if (!window.fetch) { lerr(t('loginNetWeb')); return; }
     fetch(host + '/player_api.php', { mode: 'no-cors', cache: 'no-store' })
-      .then(function () { lerr(t('loginCors')); })              /* server answered, but does not allow browsers */
+      .then(function () { lerr(t(/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? 'loginCorsMob' : 'loginCors')); })              /* server answered, but does not allow browsers */
       .catch(function () { lerr(t('loginNoReach')); });         /* server not reachable at all */
   }, 1);
 }
