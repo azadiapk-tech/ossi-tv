@@ -149,7 +149,17 @@ function submit() {
     l.forEach(function (x) { if (x.id === O.pl.id) { x.host = host; x.user = u; x.pass = p; if (!x.name || x.name === 'Ossi') x.name = u; } });
     O.plSave(l);
     O.app.switchPlaylist(O.pl.id);
-  }, function () { done(); lerr(t(/\bweb\b/.test(document.documentElement.className) ? 'loginNetWeb' : 'loginNet')); }, 1);
+  }, function () {
+    done();
+    if (!/\bweb\b/.test(document.documentElement.className)) { lerr(t('loginNet')); return; }
+    /* browser: find out WHY it failed */
+    var proto = location.protocol;
+    if (proto !== 'file:' && proto !== 'http:' && host.indexOf('http:') === 0) { lerr(t('loginOpenFile')); return; }
+    if (!window.fetch) { lerr(t('loginNetWeb')); return; }
+    fetch(host + '/player_api.php', { mode: 'no-cors', cache: 'no-store' })
+      .then(function () { lerr(t('loginCors')); })              /* server answered, but does not allow browsers */
+      .catch(function () { lerr(t('loginNoReach')); });         /* server not reachable at all */
+  }, 1);
 }
 LG.show = function () {
   if (!lbuilt) lbuild();

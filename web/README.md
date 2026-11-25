@@ -11,3 +11,9 @@ they play without sound or not at all; the Android app has no such limits. The s
 browser requests (CORS), otherwise the login shows a connection error.
 
 Rebuild after changing the app: `python3 web/build.py` (needs Pillow).
+
+## If login says the server blocks browsers (CORS)
+Keep `Ossi TV starten.bat` in the same folder as `OssiTV-Web.html` and double-click it (Windows).
+It opens the page in a separate Chrome/Edge window (own profile in `%LocalAppData%\OssiTV-Chrome`)
+with web security disabled so the page may talk to the IPTV server.
+Use that window only for Ossi TV, never for normal browsing.
