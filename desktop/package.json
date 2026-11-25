@@ -1,0 +1,40 @@
+{
+  "name": "ossi-tv",
+  "productName": "Ossi TV",
+  "version": "1.4.0",
+  "description": "Ossi TV for Windows",
+  "author": "azadiapk-tech",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "page": "python ../web/build.py app/index.html",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "dependencies": {
+    "hls.js": "1.5.17",
+    "mpegts.js": "1.7.3"
+  },
+  "build": {
+    "appId": "com.azadiapk.ossitv",
+    "productName": "Ossi TV",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "app/**/*", "build/icon.png"],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ossi TV",
+      "artifactName": "OssiTV-Setup.${ext}"
+    },
+    "portable": { "artifactName": "OssiTV-Portable.${ext}" }
+  }
+}
