@@ -304,7 +304,7 @@ function epgPump() {
   while (D.epgRun < 3 && D.epgQ.length) {
     var id = D.epgQ.pop(); D.epgRun++;
     (function (id) {
-      O.api.get('get_short_epg', '&stream_id=' + O.enc(id) + '&limit=6', function (d) { epgDone(id, epgParse(d)); }, function () { epgDone(id, []); }, 0);
+      O.api.get('get_short_epg', '&stream_id=' + O.enc(id) + '&limit=10', function (d) { epgDone(id, epgParse(d)); }, function () { epgDone(id, []); }, 0);
     })(id);
   }
 }

@@ -179,7 +179,7 @@ function slSet(k, v) {
 }
 function showInfo(keep) {
   var el = $('pInfo'); el.classList.add('show'); ctl(true); clearTimeout(infoT);
-  if (!keep) infoT = setTimeout(function () { el.classList.remove('show'); ctl(false); }, 5000);
+  if (!keep) infoT = setTimeout(function () { el.classList.remove('show'); ctl(false); }, 8000);
 }
 function showBar(keep) {
   var el = $('pVod'); el.classList.add('show'); ctl(true); clearTimeout(barT);
@@ -460,7 +460,7 @@ Pui.refresh = function () {
   var Pl = O.player, sp = $('pSpin'), er = $('pErr');
   var loading = Pl.st === 'loading';
   sp.classList.toggle('hidden', !loading);
-  if (loading) $('pSpinT').textContent = O.t('preparing');
+  if (loading) $('pSpinT').textContent = O.t(Pl.stMsg === 'reconnect' ? 'reconnecting' : 'preparing');
   if (Pl.st === 'error') {
     er.innerHTML = esc(O.t('playFail')) + '<br>' + esc(O.t('retryHint')) + (Pl.errs.length ? '<small>' + esc(Pl.errText()) + '</small>' : '');
     er.classList.remove('hidden'); if (Pui.kind === 'live') showInfo(true); else showBar(true);

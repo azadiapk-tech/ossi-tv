@@ -9,12 +9,13 @@ var Pl = O.player = {
   item: null, vod: null, rect: { x: 0, y: 0, w: 1920, h: 1080 },
   time: 0, dur: 0, errs: [], fmt: ''
 };
-var obj = null, tok = 0, attempt = 0, fmts = [], started = false, failedTok = 0, wd = 0, recon = 0, seekT = 0;
+var obj = null, tok = 0, attempt = 0, fmts = [], started = false, failedTok = 0, wd = 0, recon = 0, seekT = 0, cycles = 0;
+var lastMove = 0, lastPos = -1;   /* stall watch */
 var subs = [];
 
 Pl.on = function (fn) { subs.push(fn); };
 function emit(ev, a) { subs.forEach(function (f) { try { f(ev, a); } catch (e) {} }); }
-function setSt(s, msg) { Pl.st = s; emit('state', msg); }
+function setSt(s, msg) { Pl.st = s; Pl.stMsg = msg || ''; if (s === 'playing' || s === 'paused') lastMove = Date.now(); emit('state', msg); }
 function ok() { return !!(window.webapis && webapis.avplay); }
 
 function ensureObj() {
@@ -49,18 +50,18 @@ function fmtOrder() {
 Pl.playLive = function (ch, rect) {
   Pl.kind = 'live'; Pl.item = ch; Pl.vod = null; Pl.time = 0; Pl.dur = 0;
   if (rect) Pl.rect = rect;
-  fmts = fmtOrder(); recon = 0; Pl.errs = [];
+  fmts = fmtOrder(); recon = 0; cycles = 0; Pl.errs = [];
   start(0);
 };
 /* opts: {url, startMs, item} */
 Pl.playVod = function (opts, rect) {
   Pl.kind = 'vod'; Pl.vod = opts; Pl.item = opts.item; Pl.time = opts.startMs || 0; Pl.dur = 0;
   if (rect) Pl.rect = rect;
-  fmts = ['direct']; recon = 0; Pl.errs = [];
+  fmts = ['direct']; recon = 0; cycles = 0; Pl.errs = [];
   start(0);
 };
 Pl.retry = function () {
-  recon = 0; Pl.errs = [];
+  recon = 0; cycles = 0; Pl.errs = [];
   fmts = Pl.kind === 'live' ? fmtOrder() : ['direct'];
   start(0);
 };
@@ -74,7 +75,11 @@ function start(n) {
   clearTimeout(wd);
   var t = ++tok;
   attempt = n; started = false;
-  if (n >= fmts.length) { fatal(O.t('playFail')); return; }
+  if (n >= fmts.length) {
+    /* a live channel that does not start at all: try the whole round again a few times (short outages) */
+    if (Pl.kind === 'live' && cycles < 4) { cycles++; setSt('loading', 'reconnect'); setTimeout(function () { if (t === tok) start(0); }, 2000 * cycles); return; }
+    fatal(O.t('playFail')); return;
+  }
   setSt('loading');
   if (!ok()) { Pl.errs.push('webapis.avplay missing'); fatal(O.t('noAvplay')); return; }
   ensureObj();
@@ -89,6 +94,7 @@ function start(n) {
       onbufferingcomplete: function () { if (t === tok) began(fmt); },
       oncurrentplaytime: function (ms) {
         if (t !== tok) return;
+        if (ms !== lastPos) { lastPos = ms; lastMove = Date.now(); }
         Pl.time = ms; if (!started) began(fmt); emit('time', ms);
       },
       onstreamcompleted: function () { if (t === tok) { if (Pl.kind === 'live') reconnect(); else { setSt('idle'); emit('ended'); } } },
@@ -117,7 +123,7 @@ function start(n) {
 function began(fmt) {
   clearTimeout(wd);
   if (started) { if (Pl.st !== 'paused') setSt('playing'); return; }
-  started = true; recon = 0;
+  started = true; recon = 0; cycles = 0; lastMove = Date.now(); lastPos = -1;
   if (Pl.kind === 'live') O.cfg.set('fmt', fmt);
   try { Pl.dur = webapis.avplay.getDuration() || Pl.dur; } catch (e) {}
   setSt('playing');
@@ -130,16 +136,25 @@ function fail(t, fmt, msg) {
   if (started) { if (Pl.kind === 'live') reconnect(); else fatal(O.t('playFail')); return; }
   setTimeout(function () { if (t === tok) { stopAv(); start(attempt + 1); } }, 0);
 }
+/* automatic reconnect: the stream dropped or the internet was gone for a moment.
+   Live keeps trying for ~5 minutes (1, 2, 3, 5, 5, 5 ... s); a movie / episode continues where it stopped. */
 function reconnect() {
-  var t = tok;
-  if (recon >= 3) { stopAv(); fatal(O.t('streamLost')); return; }
+  var t = tok, max = Pl.kind === 'live' ? 60 : 12;
+  if (recon >= max) { stopAv(); fatal(O.t('streamLost')); return; }
   recon++; setSt('loading', 'reconnect');
-  setTimeout(function () { if (t === tok) start(attempt); }, 1000 * recon);
+  if (Pl.kind === 'vod' && Pl.vod && Pl.time > 0) Pl.vod.startMs = Pl.time;
+  stopAv();
+  setTimeout(function () { if (t === tok) start(attempt); }, Math.min(5000, [1000, 2000, 3000][recon - 1] || 5000));
 }
+/* a stream that silently freezes (no error, picture stuck) is restarted too */
+setInterval(function () {
+  if (!started || !lastMove || (Pl.st !== 'playing' && Pl.st !== 'loading')) return;
+  if (Date.now() - lastMove > (Pl.kind === 'live' ? 12000 : 25000)) { lastMove = Date.now(); Pl.errs.push('stalled'); started = false; reconnect(); }
+}, 2000);
 function fatal(msg) { setSt('error', msg); }
 
 Pl.stop = function () {
-  tok++; clearTimeout(wd); clearTimeout(seekT);
+  tok++; clearTimeout(wd); clearTimeout(seekT); started = false; lastMove = 0;
   stopAv(); Pl.item = null; Pl.time = 0; setSt('idle');
 };
 Pl.pause = function () { if (Pl.kind !== 'vod' || !ok()) return; try { webapis.avplay.pause(); setSt('paused'); } catch (e) {} };

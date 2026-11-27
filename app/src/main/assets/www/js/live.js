@@ -77,6 +77,7 @@ function build() {
   $('lvEdReset').onclick = function () { if (S.edit) editReset(); };
   $('lvInfo').addEventListener('click', function (e) {
     if (e.target.closest && e.target.closest('#lvArch')) openArchive(S.playing || S.view[G.ch.cur]);
+    if (e.target.closest && e.target.closest('#lvGuideBtn')) openGuide();
   });
   $('lvHome').onclick = function () { O.app.go('home'); };
   /* one search box: searches ALL channels (not the packages) */
@@ -210,6 +211,7 @@ function drawInfo() {
   $('lvInfo').innerHTML = ch ? '<h2 dir="auto">' + esc(ch.name) + '</h2><hr><p dir="auto">' + esc(S.cur ? S.cur.name : '') + '</p>' +
     (rs ? '<p class="lvres"><span class="res">' + esc(rs) + '</span></p>' : '') +
     '<div class="lvepg">' + O.epgHtml(ch ? D.epgNow(ch.id) : null, true) + '</div>' +
+    (ch ? '<b class="lvbtn" id="lvGuideBtn">📅 ' + esc(t('guide')) + '</b> ' : '') +
     (ch && ch.arch ? '<b class="lvbtn" id="lvArch">' + ARC + esc(t('archive')) + (isTouch() ? '' : ' <i class="kd b"></i>') + '</b>' : '') +
     '<p class="lvhint">' + esc(t(isTouch() ? 'prevHintT' : 'prevHint')) + '</p>' : '';
   if (ch && !D.epgNow(ch.id)) D.epg(ch.id);
@@ -433,6 +435,114 @@ function dayLabel(ms) {
   var loc = { ar: 'ar', en: 'en-GB', de: 'de-DE' }[O.lang()] || 'en-GB';
   try { return new Date(ms).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { return new Date(ms).toDateString(); }
 }
+/* ================= TV guide: programme grid of the channels in the list ================= */
+var GD = { open: false, el: null, r: 0, top: 0, tc: 0, t0: 0, rows: 8 }, gdT = 0;
+var GD_LEFT = 380, GD_ROWH = 96, GD_SPAN = 180;   /* channel column, row height, minutes on screen */
+function gdW() { return (O.stageW || 1920) - GD_LEFT - 70; }
+function gdX(ms) { return (ms - GD.t0) / 60000 / GD_SPAN * gdW(); }
+function gdList(c) { var e = D.epgC[c.id]; return e ? e.list : null; }
+function gdVis(l) { var end = GD.t0 + GD_SPAN * 60000; return (l || []).filter(function (x) { return x.e > GD.t0 && x.s < end; }); }
+function gdFocus() {
+  var c = S.view[GD.r], v = c ? gdVis(gdList(c)) : [], i;
+  for (i = 0; i < v.length; i++) if (v[i].s <= GD.tc && v[i].e > GD.tc) return { v: v, j: i };
+  for (i = 0; i < v.length; i++) if (v[i].s >= GD.tc) return { v: v, j: i };
+  return { v: v, j: v.length - 1 };
+}
+function openGuide() {
+  if (!S.view.length) { O.toast(t('empty')); return; }
+  if (!GD.el) {
+    GD.el = document.createElement('div'); GD.el.id = 'lvGuide'; GD.el.className = 'hidden'; root.appendChild(GD.el);
+    GD.el.addEventListener('click', function (e) {
+      if (e.target.closest('.gd-back')) { closeGuide(); return; }
+      var p = e.target.closest('.gd-p[data-r]'), ch = e.target.closest('.gd-ch[data-r]');
+      if (p) {
+        var r = +p.getAttribute('data-r'), s = +p.getAttribute('data-s');
+        if (r === GD.r && Math.abs(s - GD.tc) < 1000) { gdOk(); return; }
+        GD.r = r; GD.tc = Math.max(s, GD.t0); gdDraw(); return;
+      }
+      if (ch) { GD.r = +ch.getAttribute('data-r'); GD.tc = Date.now(); gdOk(); }
+    });
+    var ty = null;
+    GD.el.addEventListener('touchstart', function (e) { ty = e.touches[0].clientY; }, { passive: true });
+    GD.el.addEventListener('touchend', function (e) {
+      if (ty == null) return; var dy = e.changedTouches[0].clientY - ty; ty = null;
+      if (Math.abs(dy) > 50) gdMove(dy < 0 ? 3 : -3);
+    });
+    GD.el.addEventListener('wheel', function (e) { e.preventDefault(); gdMove(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+  }
+  var now = Date.now(), half = 1800000;
+  GD.t0 = Math.floor(now / half) * half - half;
+  GD.tc = now;
+  var i = S.playing ? S.view.indexOf(S.playing) : -1;
+  GD.r = i > -1 ? i : (G.ch.cur || 0);
+  GD.top = O.clamp(GD.r - 3, 0, Math.max(0, S.view.length - GD.rows));
+  GD.open = true; GD.el.classList.remove('hidden');
+  gdDraw();
+}
+function closeGuide() { GD.open = false; clearTimeout(gdT); if (GD.el) { GD.el.classList.add('hidden'); GD.el.innerHTML = ''; } }
+function gdSoon() { clearTimeout(gdT); gdT = setTimeout(function () { if (GD.open) gdDraw(); }, 120); }
+function gdMove(d) {
+  GD.r = O.clamp(GD.r + d, 0, S.view.length - 1);
+  if (GD.r < GD.top) GD.top = GD.r; else if (GD.r >= GD.top + GD.rows) GD.top = GD.r - GD.rows + 1;
+  gdDraw();
+}
+function gdOk() {
+  var c = S.view[GD.r]; if (!c) return;
+  var f = gdFocus(), x = f.v[f.j], now = Date.now();
+  closeGuide();
+  if (x && x.e < now && c.arch) { playArchive(c, x); return; }   /* a programme that is over: from the archive */
+  G.ch.setCur(GD.r); playChannel(c, true); enterFull();
+}
+function gdKey(e, k) {
+  var f = gdFocus(), half = 1800000;
+  if (k === K.BACK || k === K.ESC) closeGuide();
+  else if (k === K.UP) gdMove(-1);
+  else if (k === K.DOWN) gdMove(1);
+  else if (k === K.PGUP || k === K.CHDN) gdMove(-GD.rows);
+  else if (k === K.PGDN || k === K.CHUP) gdMove(GD.rows);
+  else if (k === K.RIGHT || k === K.LEFT) {
+    var all = gdList(S.view[GD.r]) || [], cur = f.v[f.j], idx = cur ? all.indexOf(cur) : -1, nx = all[idx + (k === K.RIGHT ? 1 : -1)];
+    if (nx) {
+      GD.tc = nx.s + 1;
+      while (nx.s >= GD.t0 + (GD_SPAN - 30) * 60000) GD.t0 += 2 * half;           /* scroll the time line */
+      while (nx.e <= GD.t0 + half && GD.t0 > Date.now() - 6 * 3600000) GD.t0 -= 2 * half;
+      if (GD.tc < GD.t0) GD.tc = GD.t0;
+      gdDraw();
+    }
+  }
+  else if (k === K.ENTER) gdOk();
+  e.preventDefault();
+}
+function gdDraw() {
+  var W = gdW(), now = Date.now(), f = gdFocus(), fx = f.v[f.j];
+  var h = '<div class="gd-hdr"><b class="gd-back">‹</b><h2>' + esc(t('guide')) + '</h2><span class="gd-cat" dir="auto">' + esc(S.cur ? S.cur.name : '') + '</span></div>';
+  h += '<div class="gd-ruler" style="left:' + GD_LEFT + 'px;width:' + W + 'px">';
+  for (var m = 0; m < GD_SPAN; m += 30) h += '<span style="left:' + (m / GD_SPAN * W) + 'px">' + O.fmtHM(GD.t0 + m * 60000) + '</span>';
+  h += '</div><div class="gd-rows">';
+  for (var i = GD.top; i < Math.min(S.view.length, GD.top + GD.rows); i++) {
+    var c = S.view[i], list = gdList(c), y = (i - GD.top) * GD_ROWH;
+    if (!list) D.epg(c.id, gdSoon);
+    h += '<div class="gd-row' + (i === GD.r ? ' cur' : '') + '" style="top:' + y + 'px">' +
+      '<div class="gd-ch" data-r="' + i + '"><span class="no">' + (i + 1) + '</span>' + logo(c) + '<span class="nm" dir="auto">' + esc(c.name) + '</span></div>' +
+      '<div class="gd-pr" style="left:' + GD_LEFT + 'px;width:' + W + 'px">';
+    var vis = gdVis(list);
+    if (!list) h += '<div class="gd-p empty" style="left:0;width:' + (W - 6) + 'px">' + esc(t('loading')) + '</div>';
+    else if (!vis.length) h += '<div class="gd-p empty' + (i === GD.r ? ' focus' : '') + '" style="left:0;width:' + (W - 6) + 'px">' + esc(t('noEpg')) + '</div>';
+    vis.forEach(function (x, j) {
+      var l = Math.max(0, gdX(x.s)), r = Math.min(W, gdX(x.e)), foc = i === GD.r && x === fx;
+      h += '<div class="gd-p' + (x.e <= now ? ' past' : '') + (x.s <= now && x.e > now ? ' live' : '') + (foc ? ' focus' : '') + '" data-r="' + i + '" data-s="' + x.s + '"' +
+        ' style="left:' + l.toFixed(0) + 'px;width:' + Math.max(8, r - l - 6).toFixed(0) + 'px"><b dir="auto">' + esc(x.title || '—') + '</b><small>' + O.fmtHM(x.s) + ' – ' + O.fmtHM(x.e) + '</small></div>';
+    });
+    h += '</div></div>';
+  }
+  h += '</div>';
+  var nx = gdX(now); if (nx >= 0 && nx <= W) h += '<div class="gd-now" style="left:' + (GD_LEFT + nx).toFixed(0) + 'px"></div>';
+  h += '<div class="gd-det">' + (fx ? '<b dir="auto">' + esc(fx.title || '') + '</b><span>' + O.fmtHM(fx.s) + ' – ' + O.fmtHM(fx.e) + '</span>' +
+    (fx.desc ? '<p dir="auto">' + esc(fx.desc) + '</p>' : '') : '') + '</div>';
+  if (!isTouch()) h += '<div class="gd-keys">' + esc(t('gdHint')) + '</div>';
+  GD.el.innerHTML = h;
+}
+
 function openArchive(ch) {
   if (!ch || !ch.arch) { O.toast(t('noArchive')); return; }
   O.toast(t('loading'));
@@ -479,7 +589,7 @@ Live.onRed = function (kind) {
 };
 Live.editing = function () { return !!S.edit; };
 /* long OK in a list = start selecting (same as ☰) */
-Live.canLongOk = function () { return !S.edit && !S.full && !S.overlay && !S.pick && (S.area === 'channels' || S.area === 'cats'); };
+Live.canLongOk = function () { return !GD.open && !S.edit && !S.full && !S.overlay && !S.pick && (S.area === 'channels' || S.area === 'cats'); };
 /* ☰ on a list: small options window */
 function listMenu() {
   var a = S.area, M = O.modal, rows = [];
@@ -492,6 +602,7 @@ function listMenu() {
     rows.push({ label: t('mMoveMany'), onOk: function () { M.close(); longPress(a, g.cur); } });
   }
   if (a === 'channels') rows.push({ label: t(O.fav.has('live', c.id) ? 'mFavDel' : 'mFavAdd'), onOk: function () { M.close(); toggleFav(c); } });
+  if (a === 'channels') rows.unshift({ label: '📅  ' + t('guide'), onOk: function () { M.close(); openGuide(); } });
   else if (movable) rows.push({ label: t(O.fav.has('livecat', c.id) ? 'mFavDel' : 'mFavAdd'), onOk: function () {
     M.close(); var on = O.fav.toggle('livecat', { id: c.id, name: c.name }); O.toast(on ? t('favAdded') : t('favRemoved')); G.cats.draw();
   } });
@@ -513,6 +624,8 @@ function back() {
 Live.overlayOpen = function () { return S.overlay; };
 Live.fullOpen = function () { return S.full; };
 Live.onKey = function (e, k) {
+  if (GD.open) { gdKey(e, k); return true; }
+  if (k === K.INFO && !S.full && !S.overlay && !S.edit) { openGuide(); e.preventDefault(); return true; }
   var E = S.edit, used = true, a = S.area;
   if (k === K.BACK || k === K.ESC) { back(); e.preventDefault(); return true; }
   if (E && E.mode === 'move') {
@@ -612,7 +725,7 @@ Live.show = function (arg) {
   drawPrev();
 };
 Live.hide = function () {
-  shown = false; clearTimeout(zapT);
+  shown = false; clearTimeout(zapT); closeGuide();
   if (S.edit) { S.edit = null; showEditBar(false); }
   if (!S.pick) { Pl.stop(); S.playing = null; }
   if (root) root.classList.add('hidden');
