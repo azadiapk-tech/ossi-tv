@@ -344,12 +344,12 @@ function setAspect(m) {
   var l = $('pcAsp'); if (l) l.textContent = aspLabel();
   O.toast(O.t('aspect') + ': ' + aspLabel());
 }
-function dimLabel() { var n = O.cfg.get('dim', 0); return n ? O.t('dimLvl') + ' ' + n : O.t('off'); }
+function dimLabel() { var n = Math.min(4, O.cfg.get('dim', 0)); return n ? O.t('dimLvl') + ' ' + n : O.t('off'); }
 /* a black layer over the video: level 1..5 = 10, 30, 50, 70, 90 % darker */
 function applyDim() {
   var el = $('pDim');
   if (!el) { el = document.createElement('div'); el.id = 'pDim'; var pl = $('player'); if (!pl) return; pl.insertBefore(el, pl.firstChild); }
-  var n = O.cfg.get('dim', 0);
+  var n = Math.min(4, O.cfg.get('dim', 0));
   el.style.opacity = n ? [0, .1, .3, .5, .7, .9][n] : 0;
 }
 O.applyDim = applyDim;
@@ -392,11 +392,11 @@ Pui.menu = function () {
       });
     }, { idx: Math.max(0, Pl.ASPECTS.indexOf(Pl.aspect())), light: true, onBack: function () { M.closeAll(); setAspect(Pl.aspect()); } });
   } });
-  /* picture dimming: off + 5 levels (10 % ... 90 % darker); focus previews, OK / BACK keeps it */
+  /* picture dimming: off + 4 levels (10 % ... 70 % darker); focus previews, OK / BACK keeps it */
   rows.push({ label: O.t('dimOpt'), value: dimLabel(), onOk: function () {
-    var keep = O.cfg.get('dim', 0);
+    var keep = Math.min(4, O.cfg.get('dim', 0));
     M.list(O.t('dimOpt'), function () {
-      return [0, 1, 2, 3, 4, 5].map(function (n) {
+      return [0, 1, 2, 3, 4].map(function (n) {
         return { label: n ? O.t('dimLvl') + ' ' + n : O.t('off'), value: O.cfg.get('dim', 0) === n ? '✓' : '',
           onFocus: function () { O.cfg.set('dim', n); applyDim(); M.refresh(); },
           onOk: function () { O.cfg.set('dim', n); applyDim(); M.closeAll(); } };
