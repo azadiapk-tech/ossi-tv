@@ -634,3 +634,5 @@ html.pip #pDim{display:none}
 .mrows.yn .mr[data-i="1"]{background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.45)}
 .mrows.yn .mr[data-i="0"].focus{background:linear-gradient(135deg,#16a34a,#22c55e);border-color:#fff}
 .mrows.yn .mr[data-i="1"].focus{background:linear-gradient(135deg,#dc2626,#ef4444);border-color:#fff}
+/* clock in the lists: no box, same look as the home / settings icons next to it */
+#clock:not(.inpl){background:none;padding:6px 4px;color:#e6ecff;font-size:42px;text-shadow:0 2px 8px rgba(0,0,0,.35)}
