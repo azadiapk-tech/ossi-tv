@@ -84,6 +84,7 @@ public class MainActivity extends Activity {
         setContentView(root);
 
         WebSettings s = web.getSettings();
+        if (Build.VERSION.SDK_INT >= 26) web.setDefaultFocusHighlightEnabled(false);   // no yellow focus frame on Fire TV
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);

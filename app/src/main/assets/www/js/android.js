@@ -17,7 +17,11 @@ function stageRect() {
 }
 /* 1920x1080 stage coordinates -> physical pixels of the WebView */
 function toScreen(x, y, w, h) {
-  var r = stageRect(), d = window.devicePixelRatio || 1;
+  var d = window.devicePixelRatio || 1;
+  /* full-screen video always fills the whole screen (the menus keep a small safety margin on TVs) */
+  if (x <= 0 && y <= 0 && h >= 1080 && w >= ((window.O && O.stageW) || 1920) - 1)
+    return [0, 0, Math.round(window.innerWidth * d), Math.round(window.innerHeight * d)];
+  var r = stageRect();
   return [Math.round((r.left + x * r.s) * d), Math.round((r.top + y * r.s) * d),
           Math.max(1, Math.round(w * r.s * d)), Math.max(1, Math.round(h * r.s * d))];
 }

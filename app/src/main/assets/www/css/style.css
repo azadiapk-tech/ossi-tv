@@ -601,3 +601,8 @@ html.pip #clock{display:none!important}
 /* the channel list uses the place of the removed second search box */
 .live:not(.overlay) #lvChs{top:140px;height:940px}
 html:not(.touch) .live:not(.overlay) #lvChs{height:870px}
+/* no browser focus frames (the yellow line around lists on Fire TV) */
+*:focus{outline:none!important}
+*{-webkit-tap-highlight-color:transparent}
+/* package names a little away from the list edge */
+.vd-cats .cat,#lvCats .cat{padding-left:22px}
