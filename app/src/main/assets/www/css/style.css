@@ -610,3 +610,11 @@ html:not(.touch) .live:not(.overlay) #lvChs{height:870px}
 .vd-hint{left:20px;bottom:8px;padding:8px 22px;border-radius:14px;background:rgba(6,9,32,.96);box-shadow:0 4px 18px rgba(0,0,0,.45)}
 html:not(.touch) .vd-cats{height:770px}
 html:not(.touch) .vd-grid{height:860px}
+/* TV safe area (like YouTube / Android TV apps): the backgrounds go edge to edge,
+   only the texts and buttons keep a margin, because many TVs cut off a few % at the edges */
+html:not(.touch) .vd-cats .cat,html:not(.touch) #lvCats .cat{padding-left:40px}
+html:not(.touch) .lv-hint,html:not(.touch) .vd-hint{left:44px;bottom:20px}
+html:not(.touch) .live:not(.overlay) #lvCats,html:not(.touch) .live:not(.overlay) #lvChs{height:760px}
+html:not(.touch) .live:not(.overlay) #lvChs{height:860px}
+html:not(.touch) .vd-cats{height:760px}
+html:not(.touch) .vd-grid{width:calc(1290px + var(--X,0px));height:850px}

@@ -120,8 +120,6 @@ function fit() {
   O.stageXC = Math.round(O.stageX * 0.3); O.stageXP = O.stageX - O.stageXC;
   ds.setProperty('--XC', O.stageXC + 'px'); ds.setProperty('--XP', O.stageXP + 'px');
   var s = Math.min(iw / W, ih / 1080), st = $('stage');
-  /* TVs cut a little off the picture edges (overscan): keep the app ~2% away from every edge */
-  if (document.documentElement.className.indexOf('touch') < 0) s *= 0.985;
   st.style.transform = s === 1 ? 'none' : 'scale(' + s + ')';
   st.style.left = Math.max(0, Math.round((iw - W * s) / 2)) + 'px';
   st.style.top = Math.max(0, Math.round((ih - 1080 * s) / 2)) + 'px';
