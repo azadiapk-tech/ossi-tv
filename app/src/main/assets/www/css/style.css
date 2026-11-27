@@ -555,3 +555,26 @@ html:not(.touch) .moving .ch.sel,html:not(.touch) .moving .cat.sel,html:not(.tou
 .vdrop.vcol{background:linear-gradient(180deg,#22d3ee,#d946ef)}
 .vg{-webkit-user-select:none;user-select:none}
 .vg img{-webkit-user-drag:none}
+/* v1.8 (Fire TV feedback) */
+/* home: logo a bit lower so it is fully on screen */
+#home .brand{top:46px}
+/* live: hint bar on its own background (channel names no longer show through) */
+.lv-hint{left:20px;bottom:10px;padding:8px 22px;border-radius:14px;background:rgba(6,9,32,.96);box-shadow:0 4px 18px rgba(0,0,0,.45)}
+/* live over the playing channel: no empty band above the search boxes -> more packages and channels */
+.live.overlay #lvCatS,.live.overlay #lvChS{top:14px!important}
+.live.overlay #lvCats,.live.overlay #lvChs{top:94px;height:986px}
+/* menus: lighter backdrop; over the player almost none (the picture stays visible, e.g. while choosing the size) */
+#modal{background:rgba(2,3,16,.42)}
+#modal.light{background:rgba(2,3,16,.12)}
+/* the app's own search keyboard (TV) */
+#osk{position:absolute;left:calc((var(--W,1920px) - 1240px) / 2);bottom:16px;width:1240px;padding:18px 20px 22px;box-sizing:border-box;border-radius:26px;background:rgba(10,14,44,.98);border:1px solid rgba(120,140,255,.35);box-shadow:0 10px 50px rgba(0,0,0,.6);z-index:70}
+.osk-txt{height:64px;line-height:64px;font-size:34px;padding:0 22px;border-radius:16px;background:rgba(255,255,255,.08);color:#fff;margin-bottom:12px;overflow:hidden;white-space:nowrap}
+.osk-caret{display:inline-block;width:3px;height:38px;background:#22d3ee;vertical-align:middle;margin:0 4px}
+.osk-row{display:flex;justify-content:center;margin-top:8px}
+.osk-row .ky{flex:0 0 94px;height:64px;line-height:64px;margin:0 4px;border-radius:14px;background:rgba(255,255,255,.09);color:#fff;font-size:32px;text-align:center;font-weight:600;font-style:normal}
+.osk-row .ky.focus{background:linear-gradient(135deg,#22d3ee,#8b5cf6);transform:scale(1.08)}
+.osk-row.bot{margin-top:14px}
+.osk-row.bot .ky{flex:0 0 150px;font-size:26px}
+.osk-row.bot .a-space{flex:0 0 400px}
+.osk-row.bot .a-done{background:rgba(34,211,238,.25)}
+input.osk-on{box-shadow:0 0 0 3px #22d3ee}

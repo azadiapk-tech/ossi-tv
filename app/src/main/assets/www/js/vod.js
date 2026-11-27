@@ -4,6 +4,16 @@
 var O = window.O, $ = O.$, esc = O.esc, t = O.t, K = O.K, D = O.data, Pl = O.player;
 function FULLR() { return { x: 0, y: 0, w: O.stageW || 1920, h: 1080 }; }
 
+/* "continue where you stopped?" — asked before a movie / episode with a saved position starts */
+O.askResume = function (startMs, go) {
+  if (!(startMs > 0)) { go(0); return; }
+  var at = O.fmtDur(startMs);
+  O.modal.open({ title: t('resumeQ'), msg: t('stoppedAt') + ' ' + at, rows: [
+    { label: t('resume') + '  ' + at, onOk: function () { O.modal.close(); go(startMs); } },
+    { label: t('fromStart'), onOk: function () { O.modal.close(); go(0); } }
+  ] });
+};
+
 /* ================= shared VOD player controller ================= */
 var VP = null, lastSave = 0;
 O.vodPlay = function (o) {
@@ -175,6 +185,20 @@ function makeVod(type, rootId) {
     q('.hints').style.display = S.edit ? 'none' : '';
   }
   function eDraw() { G.grid.draw(); G.cats.draw(); }
+  /* ☰ on a list: small options window */
+  function listMenu() {
+    var a = S.area, M = O.modal, rows = [];
+    if (a !== 'grid' && a !== 'cats') { O.toast(t('editFocus')); return; }
+    var g = a === 'grid' ? G.grid : G.cats, c = a === 'grid' ? S.view[g.cur] : S.catView[g.cur];
+    if (!c) return;
+    if (a === 'grid' || !c.type || c.type === 'cat') {
+      rows.push({ label: t('mMoveOne'), onOk: function () { M.close(); editStart(true); if (S.edit) eLift(); } });
+      rows.push({ label: t('mMoveMany'), onOk: function () { M.close(); editStart(false); } });
+    }
+    if (a === 'grid') rows.push({ label: t(O.fav.has(type, c.id) ? 'mFavDel' : 'mFavAdd'), onOk: function () { M.close(); toggleFav(c); } });
+    if (!rows.length) { O.toast(t('noMove')); return; }
+    M.list(c.name || t('options'), function () { return rows; }, { light: true });
+  }
   function editStart(selectCur) {
     var a = S.area;
     if (a !== 'grid' && a !== 'cats') return;
@@ -281,13 +305,13 @@ function makeVod(type, rootId) {
       }
       e.preventDefault(); return true;
     }
-    if (k === K.MENU) { editStart(false); e.preventDefault(); return true; }
+    if (k === K.MENU) { listMenu(); e.preventDefault(); return true; }
     if (k === K.BACK || k === K.ESC) { O.app.back(); e.preventDefault(); return true; }
     if (k === K.YELLOW) { if (a === 'grid' && S.view[G.grid.cur]) toggleFav(S.view[G.grid.cur]); e.preventDefault(); return true; }
     if (a === 'catSearch') {
-      if (k === K.DOWN) setArea('cats'); else if (k === K.ENTER) q('.vc').focus(); else if (k === K.UP || k === K.RIGHT) setArea('hdrSearch'); else used = false;
+      if (k === K.DOWN) setArea('cats'); else if (k === K.ENTER) O.searchKb(q('.vc')); else if (k === K.UP || k === K.RIGHT) setArea('hdrSearch'); else used = false;
     } else if (a === 'hdrSearch') {
-      if (k === K.DOWN) setArea('grid'); else if (k === K.LEFT) setArea('catSearch'); else if (k === K.ENTER) q('.vq').focus(); else used = false;
+      if (k === K.DOWN) setArea('grid'); else if (k === K.LEFT) setArea('catSearch'); else if (k === K.ENTER) O.searchKb(q('.vq')); else used = false;
     } else if (a === 'cats') {
       if (k === K.UP) { if (!G.cats.move(0, -1)) setArea('catSearch'); }
       else if (k === K.DOWN) G.cats.move(0, 1);
@@ -389,8 +413,7 @@ var DT = O.detail = {};
     var b = [], it = item(), d = S.data || {};
     if (S.kind === 'movie') {
       var p = O.pos.get('movie:' + it.id), can = p && p.t > 30000 && (!p.d || p.t < p.d * 0.95);
-      b.push({ id: 'play', ic: BI.play, label: can ? t('resume') + '  ' + O.fmtDur(p.t) : t('playMovie'), main: true });
-      if (can) b.push({ id: 'start', ic: BI.again, label: t('fromStart') });
+      b.push({ id: 'play', ic: BI.play, label: t('playMovie'), main: true });   /* a saved position is asked about when playing */
     } else if (d.seasons && d.seasons.length) {
       var last = O.store.p('lastEp.' + it.id, null), se = last && d.seasons[last.s], ep = se && se.eps[last.i];
       b.push({ id: 'play', ic: BI.play, label: ep ? t('resume') + '  ' + t('seasonShort') + se.num + ' • E' + (ep.num || last.i + 1) : t('playEp1'), main: true });
@@ -443,7 +466,8 @@ var DT = O.detail = {};
     drawBtns();
   }
   function playMovie(fromStart) {
-    var c = S.movie, p = O.pos.get('movie:' + c.id), start = !fromStart && p && p.t > 30000 && (!p.d || p.t < p.d * 0.95) ? p.t : 0;
+    var c = S.movie, p = O.pos.get('movie:' + c.id), start0 = !fromStart && p && p.t > 30000 && (!p.d || p.t < p.d * 0.95) ? p.t : 0;
+    O.askResume(start0, function (start) {
     O.recent.push('movie', slimItem(c));
     root.classList.add('hidden');
     O.vodPlay({
@@ -451,10 +475,12 @@ var DT = O.detail = {};
       url: O.api.stream('movie', c.id, (S.data && S.data.ext) || c.ext || 'mp4'), startMs: start, posKey: 'movie:' + c.id, item: c, favType: 'movie',
       onExit: function () { root.classList.remove('hidden'); drawBtns(); }
     });
+    });
   }
-  function playEp(si, ei) {
+  function playEp(si, ei, noAsk) {
     var se = S.data.seasons[si], e = se && se.eps[ei]; if (!e) return;
-    var key = 'series:' + e.id, p = O.pos.get(key), start = p && p.t > 30000 && (!p.d || p.t < p.d * 0.95) ? p.t : 0;
+    var key = 'series:' + e.id, p = O.pos.get(key), start0 = !noAsk && p && p.t > 30000 && (!p.d || p.t < p.d * 0.95) ? p.t : 0;
+    O.askResume(start0, function (start) {
     O.recent.push('series', slimItem(S.series));
     O.store.ps('lastEp.' + S.series.id, { s: si, i: ei, e: e.id, n: se.num, en: e.num || ei + 1 });
     root.classList.add('hidden');
@@ -468,11 +494,12 @@ var DT = O.detail = {};
         var ns = S.data.seasons[nx[0]], ne = ns.eps[nx[1]];
         O.pui.nextUp({
           title: S.data.name || S.series.name, sub: t('season') + ' ' + ns.num + '  •  E' + (ne.num || nx[1] + 1) + '  ' + ne.title, sec: 10,
-          go: function () { playEp(nx[0], nx[1]); },
+          go: function () { playEp(nx[0], nx[1], true); },
           cancel: function () { O.pui.exit(); Pl.stop(); back(); }
         });
       },
       onExit: back
+    });
     });
   }
   DT.show = function (arg) {

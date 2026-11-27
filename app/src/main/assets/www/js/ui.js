@@ -33,6 +33,7 @@ function render() {
   var r = rootEl();
   if (!cur) { r.classList.add('hidden'); r.innerHTML = ''; return; }
   r.classList.remove('hidden');
+  r.classList.toggle('light', !!cur.light);   /* light backdrop: the picture stays visible behind the menu */
   if (cur.build) cur.rows = cur.build();
   var h = '<div class="mbox"><h2 dir="auto">' + esc(cur.title) + '</h2>';
   if (cur.msg) h += '<div class="mmsg">' + esc(cur.msg) + '</div>';
@@ -88,7 +89,7 @@ M.setMsg = function (m) { if (cur) { cur.msg = m; render(); } };
 /* build: function returning rows [{label,value,onOk,dis}] — re-run on refresh() */
 M.list = function (title, build, opts) {
   opts = opts || {};
-  return M.open({ title: title, msg: opts.msg, build: build, idx: opts.idx || 0, onBack: opts.onBack, foot: opts.foot });
+  return M.open({ title: title, msg: opts.msg, build: build, idx: opts.idx || 0, onBack: opts.onBack, foot: opts.foot, light: opts.light });
 };
 M.confirm = function (title, msg, yes, no, defNo) {
   M.open({
@@ -129,7 +130,7 @@ M.onKey = function (e, k) {
   if (k === K.UP || k === K.DOWN) {
     var n = cur.rows.length, i = cur.idx, d = k === K.UP ? -1 : 1, g = 0;
     do { i += d; g++; } while (i >= 0 && i < n && cur.rows[i].dis && g < n);
-    if (i >= 0 && i < n) { cur.idx = i; paint(); }
+    if (i >= 0 && i < n) { cur.idx = i; paint(); if (cur.rows[i].onFocus) cur.rows[i].onFocus(cur.rows[i], i); }
   } else if (k === K.ENTER) act(cur.idx);
   else if (k === K.BACK || k === K.ESC || k === K.EXIT) { if (cur.onBack) cur.onBack(); else M.close(); }
   e.preventDefault(); return true;
@@ -337,6 +338,11 @@ function setAspect(m) {
   O.toast(O.t('aspect') + ': ' + aspLabel());
 }
 function aspLabel() { return O.t('asp_' + O.player.aspect()); }
+function previewAspect(m) {
+  O.player.setAspectMode(m);
+  var l = $('pcAsp'); if (l) l.textContent = aspLabel();
+  M.refresh();                                   /* moves the ✓ */
+}
 function cycleAspect() {
   O.player.cycleAspect();
   var l = $('pcAsp'); if (l) l.textContent = aspLabel();
@@ -354,7 +360,6 @@ function trackName(x, i) {
 Pui.menu = function () {
   var h = Pui.h || {}, rows = [], Pl = O.player;
   if (Pui.kind === 'live') {
-    if (h.ok) rows.push({ label: O.t('mList'), onOk: function () { M.close(); hideUi(); h.ok(); } });
     if (h.archive && (!h.hasArchive || h.hasArchive())) rows.push({ label: O.t('archive'), onOk: function () { M.close(); h.archive(); } });
   } else {
     rows.push({ label: O.t('audioTrack'), onOk: function () { M.close(); Pui.tracks('audio'); } });
@@ -362,14 +367,17 @@ Pui.menu = function () {
   }
   if (h.fav) rows.push({ label: O.t(h.isFav && h.isFav() ? 'mFavDel' : 'mFavAdd'), onOk: function () { M.close(); h.fav(); } });
   rows.push({ label: O.t('aspect'), value: aspLabel(), onOk: function () {
+    /* moving the focus shows the size at once; OK or BACK keeps it */
     M.list(O.t('aspect'), function () {
       return Pl.ASPECTS.map(function (m) {
-        return { label: O.t('asp_' + m), value: Pl.aspect() === m ? '✓' : '', onOk: function () { M.closeAll(); setAspect(m); } };
+        return { label: O.t('asp_' + m), value: Pl.aspect() === m ? '✓' : '',
+          onFocus: function () { previewAspect(m); },
+          onOk: function () { M.closeAll(); setAspect(m); } };
       });
-    });
+    }, { idx: Math.max(0, Pl.ASPECTS.indexOf(Pl.aspect())), light: true, onBack: function () { M.closeAll(); setAspect(Pl.aspect()); } });
   } });
   rows.push({ label: O.t('tSleep'), value: O.sleep && O.sleep.end ? Math.ceil(O.sleep.left() / 60000) + ' ' + O.t('minutes') : '', onOk: function () { O.sleep.menu(); } });
-  M.list(O.t('options'), function () { return rows; });
+  M.list(O.t('options'), function () { return rows; }, { light: true });
 };
 /* kind: 'audio' | 'text' */
 Pui.tracks = function (kind) {

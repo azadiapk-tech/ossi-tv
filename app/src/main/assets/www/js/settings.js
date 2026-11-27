@@ -223,47 +223,57 @@ function about() {
   M.message(t('tAbout'), lines.join('\n'));
 }
 
-/* ---------- speed test ---------- */
-function anyLiveId(cb, fail) {
-  if (D.liveAll && D.liveAll.length) { cb(D.liveAll[0].id); return; }
-  D.getCats('live', function (cats) {
-    if (!cats.length) { fail(); return; }
-    D.getItems('live', cats[0].id, function (l) { if (l.length) cb(l[0].id); else fail(); }, fail);
-  }, fail);
-}
+/* ---------- speed test ----------
+   Measures the internet line: 4 parallel downloads from Cloudflare's speed test server for 10 s
+   (natively on Android / Fire TV, with fetch streams on Windows) + the latency to the IPTV server.
+   The old test downloaded a TV channel, which only arrives at the channel's own bit rate (~10-25 Mbit/s). */
 function speedTest() {
-  var done = false, x = null, tmr = 0;
+  var NAT = window.OssiNative, done = false, ping = null, tmr = 0, ctrls = [];
   var cfg = M.open({ title: t('tSpeed'), msg: t('testing'), rows: [{ label: t('close'), onOk: function () { stop(); M.close(); } }] });
-  function stop() { done = true; clearInterval(tmr); try { if (x) x.abort(); } catch (e) {} }
+  function stop() {
+    done = true; clearInterval(tmr); window.__ossiSpeed = null;
+    if (NAT && NAT.speedStop) { try { NAT.speedStop(); } catch (e) {} }
+    ctrls.forEach(function (c) { try { c.abort(); } catch (e) {} });
+  }
   cfg.onBack = function () { stop(); M.close(); };
-  var t0 = Date.now(), ping = null;
-  O.getJSON(O.api.url('', ''), function () {
-    ping = Date.now() - t0;
+  function verdict(m) { return m >= 25 ? t('spd4k') : m >= 8 ? t('spdHd') : m >= 3 ? t('spdSd') : t('spdLow'); }
+  function show(mbps, fin) {
+    var txt = t('netSpeed') + ': ' + mbps.toFixed(1) + ' Mbit/s' + (fin ? '' : ' …');
+    if (ping != null) txt += '\n' + t('srvPing') + ': ' + ping + ' ms';
+    if (fin) txt += '\n' + verdict(mbps);
+    M.setMsg(txt);
+  }
+  var t0 = Date.now();
+  O.getJSON(O.api.url('', ''), function () { ping = Date.now() - t0; }, function () {}, 0);
+  window.__ossiSpeed = function (mbps, fin, any) {
     if (done) return;
-    anyLiveId(function (id) {
-      if (done) return;
-      x = new XMLHttpRequest();
-      x.open('GET', O.api.stream('live', id, 'ts'), true);
-      x.responseType = 'arraybuffer';
-      var start = 0, loaded = 0, mbps = 0;
-      x.onprogress = function (ev) { if (!start) start = Date.now(); loaded = ev.loaded; };
-      function finish() {
-        if (done) return; stop();
-        var verdict = mbps >= 25 ? t('spd4k') : mbps >= 8 ? t('spdHd') : mbps >= 3 ? t('spdSd') : t('spdLow');
-        M.setMsg(t('ping') + ': ' + ping + ' ms\n' + t('speed') + ': ' + mbps.toFixed(1) + ' Mbit/s\n' + verdict);
+    if (fin) { if (!any) { stop(); M.setMsg(t('testFail')); return; } stop(); show(+mbps || 0, true); }
+    else if (mbps > 0) show(+mbps, false);
+  };
+  if (NAT && NAT.speedTest) { NAT.speedTest(10); return; }
+  if (!window.fetch || !window.ReadableStream || !window.AbortController) { stop(); M.setMsg(t('testFail')); return; }
+  var total = 0, startAt = 0, startBytes = 0, end = Date.now() + 10000;
+  function worker() {
+    if (done || Date.now() >= end) return;
+    var ac = new AbortController(); ctrls.push(ac);
+    fetch('https://speed.cloudflare.com/__down?bytes=100000000', { signal: ac.signal, cache: 'no-store' }).then(function (r) {
+      var rd = r.body.getReader();
+      function pump() {
+        return rd.read().then(function (x) {
+          if (x.done || done || Date.now() >= end) { try { ac.abort(); } catch (e) {} worker(); return; }
+          total += x.value.length; return pump();
+        });
       }
-      x.onerror = function () { if (!loaded) { done = true; M.setMsg(t('testFail')); } else finish(); };
-      x.onloadend = function () { if (loaded) finish(); };
-      tmr = setInterval(function () {
-        if (!start) return;
-        var sec = (Date.now() - start) / 1000; if (sec < 0.3) return;
-        mbps = loaded * 8 / sec / 1e6;
-        if (sec >= 8 || loaded > 30e6) { finish(); return; }
-        M.setMsg(t('ping') + ': ' + ping + ' ms\n' + t('speed') + ': ' + mbps.toFixed(1) + ' Mbit/s …');
-      }, 500);
-      x.send();
-    }, function () { if (!done) M.setMsg(t('testFail')); });
-  }, function () { if (!done) M.setMsg(t('testFail')); }, 0);
+      return pump();
+    }).catch(function () { if (!done && Date.now() < end) setTimeout(worker, 300); });
+  }
+  for (var k = 0; k < 4; k++) worker();
+  tmr = setInterval(function () {
+    var now = Date.now(), fin = now >= end;
+    if (!startAt) { if (total > 0) { startAt = now; startBytes = total; } else if (fin) window.__ossiSpeed(0, 1, 0); return; }
+    var mbps = (total - startBytes) * 8 / ((now - startAt) / 1000) / 1e6;
+    if (window.__ossiSpeed) window.__ossiSpeed(mbps, fin ? 1 : 0, 1);
+  }, 500);
 }
 
 /* ================= multi-screen ================= */

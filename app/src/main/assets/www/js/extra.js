@@ -1,7 +1,7 @@
 /* Sleep timer, in-app updates (Android build) and first-run playlist setup. */
 (function () {
 'use strict';
-var O = window.O, t = O.t, M = O.modal;
+var O = window.O, t = O.t, M = O.modal, $ = O.$, esc = O.esc, K = O.K;
 var NAT = window.OssiNative || null;
 var DESK = window.OssiDesk || null;   /* Windows app */
 
@@ -194,4 +194,95 @@ O.logout = function () {
   O.plSetActive(O.pl.id); O.data.reset();
   O.app.go('login');
 };
+
+/* ================= the app's own search keyboard (TV remotes) =================
+   Fire TV has no Arabic system keyboard, so on TVs the search boxes use this one: Arabic + German, moved with the arrows. */
+var OSK = O.osk = {};
+var KB = { el: null, inp: null, lang: 'ar', r: 1, c: 0 };
+var LAY = {
+  ar: [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+       ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'],
+       ['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك', 'ط'],
+       ['ذ', 'ئ', 'ء', 'ؤ', 'ر', 'ى', 'ة', 'و', 'ز', 'ظ', 'د'],
+       ['أ', 'إ', 'آ', 'لا', '-', '.', ':']],
+  de: [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'ß'],
+       ['q', 'w', 'e', 'r', 't', 'z', 'u', 'i', 'o', 'p', 'ü'],
+       ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'ö', 'ä'],
+       ['y', 'x', 'c', 'v', 'b', 'n', 'm', '-', '.', '&', ':']]
+};
+var BOT = [{ a: 'lang' }, { a: 'space' }, { a: 'bs' }, { a: 'clear' }, { a: 'done' }];
+function kRows() { return LAY[KB.lang].map(function (r) { return r.map(function (ch) { return { t: ch }; }); }).concat([BOT]); }
+function kLabel(k) {
+  if (k.t) return k.t;
+  return { lang: KB.lang === 'ar' ? 'Deutsch' : 'عربي', space: t('oskSpace'), bs: '⌫', clear: t('oskClear'), done: t('oskDone') }[k.a];
+}
+function kDraw() {
+  var R = kRows(), dir = KB.lang === 'ar' ? 'rtl' : 'ltr';
+  var h = '<div class="osk-txt" dir="auto">' + esc(KB.inp.value) + '<i class="osk-caret"></i></div>';
+  R.forEach(function (row, ri) {
+    h += '<div class="osk-row' + (ri === R.length - 1 ? ' bot' : '') + '" dir="' + dir + '">';
+    row.forEach(function (k, ci) {
+      h += '<b class="ky' + (k.a ? ' a-' + k.a : '') + (ri === KB.r && ci === KB.c ? ' focus' : '') + '" data-r="' + ri + '" data-c="' + ci + '">' + esc(kLabel(k)) + '</b>';
+    });
+    h += '</div>';
+  });
+  KB.el.innerHTML = h;
+}
+function kType(v) {
+  var inp = KB.inp; if (!inp) return;
+  inp.value = v;
+  try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { var ev = document.createEvent('Event'); ev.initEvent('input', true, true); inp.dispatchEvent(ev); }
+  kDraw();
+}
+function kPress(k) {
+  var v = KB.inp.value;
+  if (k.t) kType(v + k.t);
+  else if (k.a === 'space') kType(v + ' ');
+  else if (k.a === 'bs') kType(v.slice(0, -1));
+  else if (k.a === 'clear') kType('');
+  else if (k.a === 'lang') { KB.lang = KB.lang === 'ar' ? 'de' : 'ar'; O.cfg.set('oskLang', KB.lang); KB.r = kRows().length - 1; KB.c = 0; kDraw(); }
+  else if (k.a === 'done') OSK.close();
+}
+OSK.isOpen = function () { return !!KB.inp; };
+OSK.open = function (inp) {
+  if (!inp) return;
+  if (!KB.el) {
+    KB.el = document.createElement('div'); KB.el.id = 'osk'; $('stage').appendChild(KB.el);
+    KB.el.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('.ky'); if (!b || !KB.inp) return;
+      KB.r = +b.getAttribute('data-r'); KB.c = +b.getAttribute('data-c'); kPress(kRows()[KB.r][KB.c]);
+    });
+  }
+  KB.inp = inp; KB.lang = O.cfg.get('oskLang', 'ar'); KB.r = 1; KB.c = 0;
+  inp.classList.add('osk-on');
+  KB.el.classList.remove('hidden'); kDraw();
+};
+OSK.close = function () {
+  if (!KB.inp) return;
+  KB.inp.classList.remove('osk-on'); KB.inp = null;
+  if (KB.el) { KB.el.classList.add('hidden'); KB.el.innerHTML = ''; }
+};
+OSK.onKey = function (e, k) {
+  var R = kRows(), row = R[KB.r], rtl = KB.lang === 'ar';
+  if (k === K.LEFT) KB.c = O.clamp(KB.c + (rtl ? 1 : -1), 0, row.length - 1);
+  else if (k === K.RIGHT) KB.c = O.clamp(KB.c + (rtl ? -1 : 1), 0, row.length - 1);
+  else if (k === K.UP || k === K.DOWN) {
+    var nr = O.clamp(KB.r + (k === K.UP ? -1 : 1), 0, R.length - 1);
+    if (nr !== KB.r) { var f = row.length > 1 ? KB.c / (row.length - 1) : 0; KB.r = nr; KB.c = Math.round(f * (R[nr].length - 1)); }
+  }
+  else if (k === K.ENTER) { kPress(row[KB.c]); e.preventDefault(); return; }
+  else if (k === K.BACK || k === K.ESC) OSK.close();
+  else if (k === K.BS) kType(KB.inp.value.slice(0, -1));
+  else if (k >= 48 && k <= 57) kType(KB.inp.value + (k - 48));
+  else { e.preventDefault(); return; }
+  if (KB.inp) kDraw();
+  e.preventDefault();
+};
+/* search boxes: TV -> the app keyboard, phone / PC -> the normal keyboard */
+O.searchKb = function (inp) {
+  if (!inp) return;
+  if (O.isTouch()) { inp.focus(); return; }
+  OSK.open(inp);
+};
+
 })();

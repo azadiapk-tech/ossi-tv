@@ -11,6 +11,7 @@ import android.webkit.WebView;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
+import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
@@ -24,7 +25,11 @@ import androidx.media3.common.VideoSize;
 import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.audio.AudioCapabilities;
+import androidx.media3.exoplayer.audio.AudioSink;
+import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory;
@@ -68,6 +73,7 @@ final class NativePlayers {
         int gen;                      // ignores late events from a player that was already replaced
         int x, y, w = 1, h = 1;
         float ratio;                  // picture aspect ratio of the current video
+        boolean audioRetried;         // sound mode already switched once for this stream
         String mode = "fit";          // fit | zoom | fill | 16:9 | 4:3
     }
 
@@ -122,10 +128,49 @@ final class NativePlayers {
         return s;
     }
 
+    /* ---------- sound ----------
+       Live channels often carry Dolby (AC3 / E-AC3) sound. Passing it raw to the TV ("passthrough") can get stuck
+       on Fire TV after the app was closed: the picture plays, the sound is gone until the stick restarts.
+       So when the device can decode Dolby itself we always decode in the app (normal PCM sound, like movies).
+       If a stream still ends up without any sound track, we switch the mode once and restart it. */
+    private static Boolean pcmOnly = null;
+    private static boolean hasDecoder(String mime) {
+        try {
+            android.media.MediaCodecList l = new android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS);
+            for (android.media.MediaCodecInfo ci : l.getCodecInfos()) {
+                if (ci.isEncoder()) continue;
+                for (String t : ci.getSupportedTypes()) if (t.equalsIgnoreCase(mime)) return true;
+            }
+        } catch (Throwable ignored) { }
+        return false;
+    }
+    private boolean pcm() {
+        if (pcmOnly == null) pcmOnly = hasDecoder(MimeTypes.AUDIO_AC3);
+        return pcmOnly;
+    }
+    private DefaultRenderersFactory renderers() {
+        final boolean pcm = pcm();
+        DefaultRenderersFactory f = new DefaultRenderersFactory(ctx) {
+            @Override
+            @SuppressWarnings("deprecation")
+            protected AudioSink buildAudioSink(Context c, boolean enableFloatOutput, boolean enableAudioTrackPlaybackParams) {
+                if (!pcm) return super.buildAudioSink(c, enableFloatOutput, enableAudioTrackPlaybackParams);
+                return new DefaultAudioSink.Builder(c)
+                        .setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                        .build();
+            }
+        };
+        f.setEnableDecoderFallback(true);
+        return f;
+    }
+
     void open(int id, String url) {
         Slot s = slot(id);
         releaseExo(s);
         s.url = url;
+        s.audioRetried = false;
     }
 
     void prepare(int id) {
@@ -142,9 +187,11 @@ final class NativePlayers {
         DefaultExtractorsFactory ext = new DefaultExtractorsFactory()
                 .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
                         | DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS);
-        ExoPlayer exo = new ExoPlayer.Builder(ctx)
+        ExoPlayer exo = new ExoPlayer.Builder(ctx, renderers())
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(http, ext))
                 .build();
+        exo.setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true);
 
         MediaItem.Builder item = new MediaItem.Builder().setUri(s.url);
         if (s.url.toLowerCase(Locale.ROOT).contains(".m3u8")) item.setMimeType(MimeTypes.APPLICATION_M3U8);
@@ -189,6 +236,26 @@ final class NativePlayers {
             @Override public void onTracksChanged(@NonNull Tracks tracks) {
                 if (s.gen != gen) return;
                 emit(s.id, "trackschanged", 0, null);
+                boolean hasAudio = false, audioOn = false;
+                for (Tracks.Group g : tracks.getGroups()) {
+                    if (g.getType() != C.TRACK_TYPE_AUDIO) continue;
+                    hasAudio = true;
+                    if (g.isSelected()) audioOn = true;
+                }
+                if (hasAudio && !audioOn) {
+                    if (!s.audioRetried) {               // the sound could not be used: switch mode once and restart
+                        s.audioRetried = true;
+                        pcmOnly = !pcm();
+                        final boolean play = s.exo != null && s.exo.getPlayWhenReady();
+                        main.post(new Runnable() { @Override public void run() {
+                            if (s.gen != gen) return;
+                            prepare(s.id);
+                            if (play && s.exo != null) s.exo.setPlayWhenReady(true);
+                        } });
+                    } else {
+                        emit(s.id, "toast", 0, "\u062a\u0639\u0630\u0651\u0631 \u062a\u0634\u063a\u064a\u0644 \u0635\u0648\u062a \u0647\u0630\u0627 \u0627\u0644\u0628\u062b");
+                    }
+                }
             }
 
             @Override public void onPlayerError(@NonNull PlaybackException e) {

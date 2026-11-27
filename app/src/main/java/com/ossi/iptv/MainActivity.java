@@ -186,6 +186,7 @@ public class MainActivity extends Activity {
     }
 
     private long stoppedAt = 0;
+    private volatile int speedRun = 0;
 
     @Override
     protected void onPause() {
@@ -395,6 +396,48 @@ public class MainActivity extends Activity {
             } });
         }
         @JavascriptInterface public int versionCode() { return BuildConfig.VERSION_CODE; }
+
+        /* internet speed test: 4 parallel downloads from Cloudflare's speed test server for a few seconds.
+           (The old test downloaded a TV channel, which only arrives at the channel's own bit rate.) */
+        @JavascriptInterface public void speedTest(final int seconds) {
+            speedStop();
+            final int run = ++speedRun;
+            final java.util.concurrent.atomic.AtomicLong bytes = new java.util.concurrent.atomic.AtomicLong();
+            final long t0 = android.os.SystemClock.elapsedRealtime(), end = t0 + Math.max(4, Math.min(seconds, 15)) * 1000L;
+            for (int k = 0; k < 4; k++) {
+                new Thread(new Runnable() { @Override public void run() {
+                    byte[] buf = new byte[64 * 1024];
+                    while (speedRun == run && android.os.SystemClock.elapsedRealtime() < end) {
+                        java.net.HttpURLConnection c = null;
+                        try {
+                            c = (java.net.HttpURLConnection) new java.net.URL("https://speed.cloudflare.com/__down?bytes=100000000").openConnection();
+                            c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                            c.setRequestProperty("User-Agent", "OssiTV");
+                            java.io.InputStream in = c.getInputStream();
+                            int n;
+                            while (speedRun == run && android.os.SystemClock.elapsedRealtime() < end && (n = in.read(buf)) > 0) bytes.addAndGet(n);
+                            in.close();
+                        } catch (Exception e) {
+                            try { Thread.sleep(300); } catch (InterruptedException ignored) { }
+                        } finally { if (c != null) c.disconnect(); }
+                    }
+                } }).start();
+            }
+            new Thread(new Runnable() { @Override public void run() {
+                long startAt = 0, startBytes = 0;
+                while (speedRun == run) {
+                    try { Thread.sleep(500); } catch (InterruptedException ignored) { }
+                    long now = android.os.SystemClock.elapsedRealtime(), b = bytes.get();
+                    if (startAt == 0) { if (b > 0) { startAt = now; startBytes = b; } }   /* skip the connection setup */
+                    boolean done = now >= end;
+                    double mbps = startAt > 0 && now > startAt ? (b - startBytes) * 8.0 / ((now - startAt) / 1000.0) / 1e6 : 0;
+                    js("window.__ossiSpeed&&__ossiSpeed(" + String.format(java.util.Locale.ROOT, "%.2f", mbps) + "," + (done ? 1 : 0) + "," + (b > 0 ? 1 : 0) + ")");
+                    if (done) { if (speedRun == run) speedRun++; break; }
+                }
+            } }).start();
+        }
+
+        @JavascriptInterface public void speedStop() { speedRun++; }
         @JavascriptInterface public void downloadUpdate(final String url) { MainActivity.this.downloadUpdate(url); }
         @JavascriptInterface public void installUpdate() {
             main.post(new Runnable() { @Override public void run() { MainActivity.this.installUpdate(); } });

@@ -52,7 +52,7 @@ function build() {
     '<div class="sbox" id="lvChS" style="left:580px;top:140px;width:600px">' + O.ic.search + '<input id="lvChQ" placeholder="' + esc(t('searchCh')) + '"></div>' +
     '<div class="lv-list" id="lvCats"></div><div class="lv-list" id="lvChs"></div>' +
     '<div class="lv-prev msg" id="lvPrev"></div><div class="lv-info" id="lvInfo"></div>' +
-    '<div class="hints lv-hint"><span><i class="kd w"></i>OK</span><span><i class="kd y"></i>' + esc(t('hFav')) + '</span><span><i class="kd r"></i>' + esc(t('hSort')) + '</span></div>' +
+    '<div class="hints lv-hint"><span><i class="kd w"></i>OK</span><span>☰ ' + esc(t('hMenu')) + '</span><span>' + esc(t('hLongSort')) + '</span></div>' +
     '<div class="editbar hidden" id="lvEdit"></div>' +
     '<div class="editbar tbar hidden" id="lvEditT"><span class="et" dir="auto">' + esc(t('eTouch')) + '</span>' +
     '<b class="ebtn" id="lvEdReset">' + esc(t('resetOrder')) + '</b><b class="ebtn on" id="lvEdDone">' + esc(t('eDone')) + '</b></div>';
@@ -466,6 +466,21 @@ Live.onRed = function (kind) {
 Live.editing = function () { return !!S.edit; };
 /* long OK in a list = start selecting (same as ☰) */
 Live.canLongOk = function () { return !S.edit && !S.full && !S.overlay && !S.pick && (S.area === 'channels' || S.area === 'cats'); };
+/* ☰ on a list: small options window */
+function listMenu() {
+  var a = S.area, M = O.modal, rows = [];
+  if (a !== 'channels' && a !== 'cats') { O.toast(t('editFocus')); return; }
+  var g = a === 'channels' ? G.ch : G.cats, c = a === 'channels' ? S.view[g.cur] : S.catView[g.cur];
+  if (!c) return;
+  var movable = !c.type || c.type === 'cat';
+  if (movable) {
+    rows.push({ label: t('mMoveOne'), onOk: function () { M.close(); longPress(a, g.cur); if (S.edit) startMove(); } });
+    rows.push({ label: t('mMoveMany'), onOk: function () { M.close(); longPress(a, g.cur); } });
+  }
+  if (a === 'channels') rows.push({ label: t(O.fav.has('live', c.id) ? 'mFavDel' : 'mFavAdd'), onOk: function () { M.close(); toggleFav(c); } });
+  if (!rows.length) { O.toast(t('noMove')); return; }
+  M.list(c.name || t('options'), function () { return rows; }, { light: true });
+}
 Live.onLongOk = function () { longPress(S.area, (S.area === 'channels' ? G.ch : G.cats).cur); };
 
 /* ---------- keys ---------- */
@@ -491,7 +506,7 @@ Live.onKey = function (e, k) {
     e.preventDefault(); return true;
   }
   if (k === K.MENU) {
-    if (!E) { if (!S.overlay && !S.full) enterEdit(); }
+    if (!E) { if (!S.overlay && !S.full) listMenu(); }
     else startMove();
     e.preventDefault(); return true;
   }
@@ -506,7 +521,7 @@ Live.onKey = function (e, k) {
     if (k === K.DOWN) setArea(a === 'catSearch' ? 'cats' : 'channels');
     else if (k === K.RIGHT && a === 'catSearch') setArea('chSearch');
     else if (k === K.LEFT && a === 'chSearch') setArea('catSearch');
-    else if (k === K.ENTER) $(a === 'catSearch' ? 'lvCatQ' : 'lvChQ').focus();
+    else if (k === K.ENTER) O.searchKb($(a === 'catSearch' ? 'lvCatQ' : 'lvChQ'));
     else used = false;
   } else if (a === 'cats') {
     if (k === K.UP) { if (!G.cats.move(0, -1) && !E) setArea('catSearch'); }

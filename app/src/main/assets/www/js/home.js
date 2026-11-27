@@ -19,7 +19,6 @@ function build() {
     h += '<div class="tile" data-i="' + i + '">' + x.i + '<h3 dir="auto">' + esc(t(x.l)) + '</h3><p dir="auto">' + esc(t(x.s)) + '</p></div>';
   });
   h += '</div><div class="cw-h" dir="auto">' + esc(t('continue')) + '</div><div class="cw" id="hCont"></div>';
-  h += '<div class="hints"><span><i class="kd w"></i>OK</span><span>◀ ▶ ▲ ▼</span><span>BACK — ' + esc(t('exitTitle')) + '</span></div>';
   root.innerHTML = h;
   root.addEventListener('click', function (e) {
     var c = e.target.closest && e.target.closest('.tile');

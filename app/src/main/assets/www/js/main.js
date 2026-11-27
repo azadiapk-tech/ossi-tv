@@ -56,6 +56,7 @@ function onKey(e) {
     if (k === K.ENTER || k === K.BACK || k === K.ESC) { ae.blur(); e.preventDefault(); return; }
     if (k === K.UP || k === K.DOWN) ae.blur(); else return;
   }
+  if (O.osk && O.osk.isOpen()) { O.osk.onKey(e, k); return; }   /* the app's own search keyboard (TV) */
   if (O.modal.isOpen()) { if (k !== K.MENU) O.modal.onKey(e, k); else e.preventDefault(); return; }
 
   /* OK held (~0.65s) in lists = start re-ordering; a short press acts on key release */
