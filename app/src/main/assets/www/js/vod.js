@@ -67,7 +67,7 @@ function makeVod(type, rootId) {
       '<div class="pane lv-cats" style="background:rgba(4,10,26,.55)"></div>' +
       '<div class="sbox vcs" style="left:20px;top:140px;width:520px">' + O.ic.search + '<input class="vc srch" placeholder="' + esc(t(type === 'movie' ? 'searchMovies' : 'searchSeries')) + '"></div>' +
       '<div class="lv-list vd-cats"></div><div class="lv-list vd-grid"></div>' +
-      '<div class="hints"><span><i class="kd w"></i>OK</span><span><i class="kd y"></i>' + esc(t('hFav')) + '</span><span>☰  ' + esc(t('eTitle2')) + '</span></div>' +
+      '<div class="hints vd-hint"><span><i class="kd w"></i>OK</span><span>☰ ' + esc(t('hMenu')) + '</span><span>' + esc(t('hLongSort')) + '</span></div>' +
       '<div class="editbar hidden vd-edit"></div>' +
       '<div class="editbar tbar hidden vd-editT"><span class="et" dir="auto">' + esc(t('eTouch')) + '</span>' +
       '<b class="ebtn vd-edReset">' + esc(t('resetOrder')) + '</b><b class="ebtn on vd-edDone">' + esc(t('eDone')) + '</b></div>';

@@ -606,3 +606,7 @@ html:not(.touch) .live:not(.overlay) #lvChs{height:870px}
 *{-webkit-tap-highlight-color:transparent}
 /* package names a little away from the list edge */
 .vd-cats .cat,#lvCats .cat{padding-left:22px}
+/* movies / series: same hint bar as the channels (own background, lists end above it) */
+.vd-hint{left:20px;bottom:8px;padding:8px 22px;border-radius:14px;background:rgba(6,9,32,.96);box-shadow:0 4px 18px rgba(0,0,0,.45)}
+html:not(.touch) .vd-cats{height:770px}
+html:not(.touch) .vd-grid{height:860px}
