@@ -376,6 +376,7 @@ Pui.menu = function () {
       });
     }, { idx: Math.max(0, Pl.ASPECTS.indexOf(Pl.aspect())), light: true, onBack: function () { M.closeAll(); setAspect(Pl.aspect()); } });
   } });
+  rows.push({ label: O.t('clockOpt'), value: O.t(O.clock.on() ? 'on' : 'off'), onOk: function (row) { O.clock.toggle(); row.value = O.t(O.clock.on() ? 'on' : 'off'); M.refresh(); } });
   rows.push({ label: O.t('tSleep'), value: O.sleep && O.sleep.end ? Math.ceil(O.sleep.left() / 60000) + ' ' + O.t('minutes') : '', onOk: function () { O.sleep.menu(); } });
   M.list(O.t('options'), function () { return rows; }, { light: true });
 };

@@ -578,3 +578,20 @@ html:not(.touch) .moving .ch.sel,html:not(.touch) .moving .cat.sel,html:not(.tou
 .osk-row.bot .a-space{flex:0 0 400px}
 .osk-row.bot .a-done{background:rgba(34,211,238,.25)}
 input.osk-on{box-shadow:0 0 0 3px #22d3ee}
+/* v1.8.1 */
+/* packages: number, yellow star for favourite packages, check box while re-ordering */
+.cat{padding:0 22px 0 14px}
+.cat .no{flex:none;min-width:46px;font-size:24px;font-weight:700;color:#b9c7e3;margin-right:10px;text-align:center}
+.cat .cstar{flex:none;color:#ffd23f;font-size:28px;margin-right:10px;text-shadow:0 0 10px rgba(255,210,63,.5)}
+.cat .ck{margin-left:12px}
+.ck.on{display:flex;align-items:center;justify-content:center}
+.ck.on::after{content:'✓';color:#14122a;font-size:26px;font-weight:900;line-height:1}
+/* channel numbers readable from the sofa */
+.ch .no{width:62px;font-size:26px;font-weight:700;color:#c9d6f0}
+/* TV: the lists end above the hint bar (names no longer hidden behind it) */
+html:not(.touch) .live:not(.overlay) #lvCats,html:not(.touch) .live:not(.overlay) #lvChs{height:770px}
+html:not(.touch) .live:not(.overlay) .lv-hint{bottom:8px}
+/* digital clock */
+#clock{position:absolute;left:250px;top:34px;z-index:66;padding:6px 18px;border-radius:14px;background:rgba(6,9,32,.72);color:#fff;font-size:40px;font-weight:700;letter-spacing:2px;font-variant-numeric:tabular-nums;pointer-events:none}
+#clock.inpl{left:36px;top:26px;font-size:36px;background:rgba(0,0,0,.45)}
+html.pip #clock{display:none!important}

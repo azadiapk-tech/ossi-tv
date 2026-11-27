@@ -124,6 +124,7 @@ var T = {
   loginNet: ['تعذر الاتصال بالسيرفر، تحقق من الإنترنت', 'Cannot reach the server, check the internet', 'Server nicht erreichbar, Internet prüfen'],
   logout: ['تسجيل الخروج', 'Sign out', 'Abmelden'],
   oskSpace: ['مسافة', 'Space', 'Leertaste'], oskClear: ['مسح', 'Clear', 'Löschen'], oskDone: ['تم', 'Done', 'Fertig'],
+  clockOpt: ['الساعة على الشاشة', 'Clock on screen', 'Uhr anzeigen'],
   mMoveOne: ['نقل', 'Move', 'Verschieben'],
   mMoveMany: ['تحديد عدة عناصر للنقل', 'Select several to move', 'Mehrere zum Verschieben wählen'],
   hMenu: ['خيارات', 'Options', 'Optionen'],

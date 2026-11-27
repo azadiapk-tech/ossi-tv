@@ -91,10 +91,13 @@ function build() {
 
 /* ---------- rows ---------- */
 function catRow(i) {
-  var c = S.catView[i], act = S.cur && S.cur.id === c.id, sel = S.edit && S.edit.sel[key(c)];
-  return '<div class="cat' + (c.type !== 'cat' ? ' pseudo' : '') + (act ? ' act' : '') + (sel ? ' sel' : '') + '" data-i="' + i + '">' +
+  var c = S.catView[i], act = S.cur && S.cur.id === c.id, sel = S.edit && S.edit.sel[key(c)], real = c.type === 'cat';
+  var no = real ? S.cats.indexOf(c) - PSEUDO + 1 : 0, fav = real && O.fav.has('livecat', c.id);
+  var editing = S.edit && S.edit.area === 'cats' && real;
+  return '<div class="cat' + (!real ? ' pseudo' : '') + (act ? ' act' : '') + (sel ? ' sel' : '') + '" data-i="' + i + '">' +
+    (real ? '<span class="no">' + no + '</span>' : '') + (fav ? '<span class="cstar">★</span>' : '') +
     '<span class="nm" dir="auto">' + esc(c.name) + '</span>' + (O.par.isLocked('live', c) ? O.ic.lock : '') +
-    '<b>' + (c.count != null ? c.count : '') + '</b></div>';
+    (editing ? '<span class="ck' + (sel ? ' on' : '') + '"></span>' : '<b>' + (c.count != null ? c.count : '') + '</b>') + '</div>';
 }
 function chRow(i) {
   var c = S.view[i], fav = O.fav.has('live', c.id), sel = S.edit && S.edit.sel[key(c)];
@@ -478,6 +481,9 @@ function listMenu() {
     rows.push({ label: t('mMoveMany'), onOk: function () { M.close(); longPress(a, g.cur); } });
   }
   if (a === 'channels') rows.push({ label: t(O.fav.has('live', c.id) ? 'mFavDel' : 'mFavAdd'), onOk: function () { M.close(); toggleFav(c); } });
+  else if (movable) rows.push({ label: t(O.fav.has('livecat', c.id) ? 'mFavDel' : 'mFavAdd'), onOk: function () {
+    M.close(); var on = O.fav.toggle('livecat', { id: c.id, name: c.name }); O.toast(on ? t('favAdded') : t('favRemoved')); G.cats.draw();
+  } });
   if (!rows.length) { O.toast(t('noMove')); return; }
   M.list(c.name || t('options'), function () { return rows; }, { light: true });
 }

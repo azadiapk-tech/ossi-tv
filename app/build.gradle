@@ -54,6 +54,9 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:$media3"
     implementation "androidx.media3:media3-exoplayer-hls:$media3"
     implementation "androidx.media3:media3-ui:$media3"
+    // FFmpeg sound decoders (MP2, AC3, E-AC3, DTS ...): many Kurdish / Arabic channels send MP2 sound,
+    // which Android itself cannot decode. Built for media3 1.4.1 by the Jellyfin project.
+    implementation "org.jellyfin.media3:media3-ffmpeg-decoder:${media3}+1"
     implementation "androidx.annotation:annotation:1.8.2"
     implementation "androidx.core:core:1.13.1"
 }

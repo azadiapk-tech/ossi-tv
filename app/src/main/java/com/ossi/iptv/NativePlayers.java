@@ -163,6 +163,7 @@ final class NativePlayers {
             }
         };
         f.setEnableDecoderFallback(true);
+        f.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON);   // FFmpeg when Android has no decoder (e.g. MP2)
         return f;
     }
 
