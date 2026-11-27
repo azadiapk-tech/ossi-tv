@@ -372,6 +372,7 @@ var DT = O.detail = {};
   var root, built = false, grid = null;
   var S = { kind: 'series', series: null, movie: null, data: null, si: 0, so: 0, area: 'eps', bi: 0, err: null, loading: false, btns: [] };
   var BI = {
+    tr: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="1.9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z" fill="none" stroke="#fff" stroke-width="1.7"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="#fff"/></svg>',
     again: '<svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2-4.9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 4v4h4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     trailer: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="3.5" fill="none" stroke="#fff" stroke-width="2"/><path d="M10 9v6l5-3z" fill="#fff"/></svg>',
@@ -429,6 +430,7 @@ var DT = O.detail = {};
       b.push({ id: 'play', ic: BI.play, label: ep ? t('resume') + '  ' + t('seasonShort') + se.num + ' • E' + (ep.num || last.i + 1) : t('playEp1'), main: true });
     }
     if (d.trailer) b.push({ id: 'trailer', ic: BI.trailer, label: t('trailer') });
+    if (d.plot) b.push({ id: 'tr', ic: BI.tr, label: S.trOn ? t('trOrig') : t('trBtn') });
     var fav = O.fav.has(favType(), it.id);
     b.push({ id: 'fav', ic: fav ? BI.favOn : BI.fav, label: fav ? t('favRemove') : t('favAdd') });
     S.btns = b; if (S.bi >= b.length) S.bi = 0;
@@ -450,6 +452,14 @@ var DT = O.detail = {};
     } else if (x.id === 'start') playMovie(true);
     else if (x.id === 'trailer') {
       if (NAT && NAT.openUrl) NAT.openUrl(O.trailerUrl(d.trailer)); else if (window.OssiDesk) window.OssiDesk.openUrl(O.trailerUrl(d.trailer)); else O.toast(t('trailerNA'));
+    } else if (x.id === 'tr') {
+      if (S.trOn) { S.trOn = false; $('dtPlot').textContent = d.plot; drawBtns(); return; }
+      var plot = d.plot; O.toast(t('trWait'));
+      D.translate(plot, function (txt) {
+        if (S.data !== d) return;
+        if (!txt) { O.toast(t('trSame')); return; }
+        S.trOn = true; $('dtPlot').textContent = txt; drawBtns();
+      }, function () { if (S.data === d) O.toast(t('trFail')); });
     } else if (x.id === 'fav') {
       var on = O.fav.toggle(favType(), slimItem(it)); O.toast(on ? t('favAdded') : t('favRemoved')); drawBtns();
     }
@@ -465,7 +475,7 @@ var DT = O.detail = {};
     var meta = [];
     if (d) { if (d.year) meta.push(d.year); var r = parseFloat(d.rating || it.rating); if (r > 0) meta.push('★ ' + r.toFixed(1)); if (d.dur) meta.push(d.dur); if (d.genre) meta.push(d.genre); }
     $('dtMeta').textContent = meta.join('   •   ');
-    $('dtPlot').textContent = d ? d.plot : '';
+    S.trOn = false; $('dtPlot').textContent = d ? d.plot : '';
     var crew = '';
     if (d && d.director) crew += '<div dir="auto"><b>' + esc(t('director')) + ':</b> ' + esc(d.director) + '</div>';
     if (d && d.cast) crew += '<div dir="auto"><b>' + esc(t('cast')) + ':</b> ' + esc(d.cast) + '</div>';

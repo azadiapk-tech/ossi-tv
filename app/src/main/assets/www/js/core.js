@@ -233,6 +233,20 @@ D.getAllVod = function (type, ok, fail) {
     ok(D.vodAll[type]);
   }, fail);
 };
+/* machine translation of a text (movie / series story) into the app language; cached on the device */
+D.translate = function (text, ok, fail) {
+  var tl = O.lang(), key = 'tr.' + tl + '.' + text.length + '.' + text.slice(0, 40);
+  var hit = O.store.g(key, null); if (hit) { ok(hit); return; }
+  var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' + tl + '&dt=t&q=' + encodeURIComponent(text.slice(0, 4500));
+  O.getJSON(url, function (d) {
+    var out = '';
+    try { (d[0] || []).forEach(function (seg) { if (seg && seg[0]) out += seg[0]; }); } catch (e) {}
+    if (!out) { fail(); return; }
+    var src = d && d[2];
+    if (src && src === tl) { ok(null); return; }             /* already in this language */
+    O.store.gs(key, out); ok(out);
+  }, fail, 1);
+};
 D.seriesInfo = function (id, ok, fail) {
   return O.api.get('get_series_info', '&series_id=' + O.enc(id), function (d) {
     var inf = (d && d.info) || {}, eps = (d && d.episodes) || {};
