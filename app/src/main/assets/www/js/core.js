@@ -166,7 +166,7 @@ D.reset = function () {
   D.info = null; D.server = null;
   D.cats = { live: null, movie: null, series: null };
   D.liveAll = null; D.byCat = null; D.allLoading = false; D.allCbs = [];
-  D.cache = {}; D.cacheKeys = [];
+  D.cache = {}; D.cacheKeys = []; D.vodAll = {};
   D.epgC = {}; D.epgQ = []; D.epgWait = {}; D.epgRun = 0;
 };
 D.reset();
@@ -222,6 +222,15 @@ D.getItems = function (type, cat, ok, fail) {
     D.cache[key] = l; D.cacheKeys.push(key);
     while (D.cacheKeys.length > 8) delete D.cache[D.cacheKeys.shift()];
     ok(l);
+  }, fail);
+};
+/* every movie / every series (for the search) — loaded once, kept until the data is refreshed */
+D.getAllVod = function (type, ok, fail) {
+  D.vodAll = D.vodAll || {};
+  if (D.vodAll[type]) { ok(D.vodAll[type]); return null; }
+  return O.api.get(ACT[type][1], null, function (d) {
+    D.vodAll[type] = Array.isArray(d) ? d.map(function (c) { return norm(type, c); }) : [];
+    ok(D.vodAll[type]);
   }, fail);
 };
 D.seriesInfo = function (id, ok, fail) {

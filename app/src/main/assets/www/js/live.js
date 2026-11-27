@@ -48,8 +48,7 @@ function build() {
     '<div class="lv-shadow"></div><div class="hdr"></div>' + O.brandBack(t('live')) +
     '<div class="hbtn" id="lvHome" style="left:1790px;margin-left:var(--X,0px)">' + O.ic.home + '</div>' +
     '<div class="pane lv-cats"></div><div class="pane lv-chs"></div>' +
-    '<div class="sbox" id="lvCatS" style="left:20px;top:140px;width:520px">' + O.ic.search + '<input id="lvCatQ" placeholder="' + esc(t('searchCat')) + '"></div>' +
-    '<div class="sbox" id="lvChS" style="left:580px;top:140px;width:600px">' + O.ic.search + '<input id="lvChQ" placeholder="' + esc(t('searchCh')) + '"></div>' +
+    '<div class="sbox" id="lvCatS" style="left:20px;top:140px;width:520px">' + O.ic.search + '<input id="lvCatQ" class="srch" placeholder="' + esc(t('searchCh')) + '"></div>' +
     '<div class="lv-list" id="lvCats"></div><div class="lv-list" id="lvChs"></div>' +
     '<div class="lv-prev msg" id="lvPrev"></div><div class="lv-info" id="lvInfo"></div>' +
     '<div class="hints lv-hint"><span><i class="kd w"></i>OK</span><span>☰ ' + esc(t('hMenu')) + '</span><span>' + esc(t('hLongSort')) + '</span></div>' +
@@ -80,12 +79,11 @@ function build() {
     if (e.target.closest && e.target.closest('#lvArch')) openArchive(S.playing || S.view[G.ch.cur]);
   });
   $('lvHome').onclick = function () { O.app.go('home'); };
+  /* one search box: searches ALL channels (not the packages) */
   $('lvCatQ').addEventListener('input', function () {
-    clearTimeout(searchT); searchT = setTimeout(function () { S.qc = $('lvCatQ').value.toLowerCase().replace(/^\s+|\s+$/g, ''); filterCats(); G.cats.reset(); }, 200);
+    clearTimeout(searchT); searchT = setTimeout(function () { globalSearch($('lvCatQ').value.toLowerCase().replace(/^\s+|\s+$/g, '')); }, 250);
   });
-  $('lvChQ').addEventListener('input', function () {
-    clearTimeout(searchT); searchT = setTimeout(function () { S.qh = $('lvChQ').value.toLowerCase().replace(/^\s+|\s+$/g, ''); applyView(); G.ch.reset(); drawCh(); drawInfo(); }, 200);
-  });
+
   built = true;
 }
 
@@ -128,6 +126,20 @@ function refreshCounts() {
     else c.count = D.byCat ? (D.byCat[c.id] || []).length : null;
   });
 }
+/* search all channels: results show in the channel list ("all channels" stays marked) */
+function globalSearch(qv) {
+  if (!qv) { if (S.searching) { var back = S.preSearch; S.searching = false; if (back) loadList(back, false); } return; }
+  if (!S.searching) { S.searching = true; S.preSearch = S.cur; }
+  var tk = ++S.tok, allE = null;
+  S.cats.forEach(function (c) { if (c.type === 'all') allE = c; });
+  S.cur = allE; S.loading = !D.liveAll; if (S.loading) drawCh();
+  D.loadAllLive(function (list) {
+    if (tk !== S.tok) return;
+    if (O.par.active()) { var ls = lockedSet(); list = list.filter(function (x) { return !ls[x.cat]; }); }
+    S.loading = false; S.err = null; S.all = list; S.qh = qv; applyView();
+    G.ch.reset(); drawCh(); drawInfo(); G.cats.draw();
+  }, function (err) { if (tk !== S.tok) return; S.loading = false; S.err = err; drawCh(); });
+}
 function filterCats() {
   var q = S.qc;
   S.catView = q ? S.cats.filter(function (c) { return c.name.toLowerCase().indexOf(q) > -1; }) : S.cats;
@@ -148,7 +160,7 @@ function lockedSet() {
 function loadList(entry, toChannels, keep) {
   S.cur = entry; S.retry = null;
   O.store.ps('last.live', { cat: entry.id });
-  S.qh = ''; $('lvChQ').value = '';
+  S.qh = ''; S.searching = false; $('lvCatQ').value = '';
   var tk = ++S.tok;
   if (entry.type === 'recent') { setAll(O.recent.list('live'), toChannels, keep); return; }
   if (entry.type === 'fav') { setAll(O.applyOrder(O.fav.list('live'), O.store.p('order.ch.fav', []), 'id'), toChannels, keep); return; }
@@ -222,7 +234,6 @@ function setArea(a) {
   S.area = a;
   G.cats.setActive(a === 'cats'); G.ch.setActive(a === 'channels');
   $('lvCatS').classList.toggle('focus', a === 'catSearch');
-  $('lvChS').classList.toggle('focus', a === 'chSearch');
   if (!S.full) drawPrev();
 }
 
@@ -523,11 +534,10 @@ Live.onKey = function (e, k) {
   }
   if (k === K.BLUE) { if (E) editReset(); else if (!S.overlay) openArchive(S.playing || S.view[G.ch.cur]); e.preventDefault(); return true; }
 
-  if (a === 'catSearch' || a === 'chSearch') {
-    if (k === K.DOWN) setArea(a === 'catSearch' ? 'cats' : 'channels');
-    else if (k === K.RIGHT && a === 'catSearch') setArea('chSearch');
-    else if (k === K.LEFT && a === 'chSearch') setArea('catSearch');
-    else if (k === K.ENTER) O.searchKb($(a === 'catSearch' ? 'lvCatQ' : 'lvChQ'));
+  if (a === 'catSearch') {
+    if (k === K.DOWN) setArea('cats');
+    else if (k === K.RIGHT) { if (S.view.length) setArea('channels'); }
+    else if (k === K.ENTER) O.searchKb($('lvCatQ'));
     else used = false;
   } else if (a === 'cats') {
     if (k === K.UP) { if (!G.cats.move(0, -1) && !E) setArea('catSearch'); }
@@ -538,7 +548,7 @@ Live.onKey = function (e, k) {
     else if (k === K.PGDN || k === K.CHUP) G.cats.page(1);
     else used = false;
   } else if (a === 'channels') {
-    if (k === K.UP) { if (!G.ch.move(0, -1) && !E) setArea('chSearch'); }
+    if (k === K.UP) { if (!G.ch.move(0, -1) && !E) setArea('catSearch'); }
     else if (k === K.DOWN) G.ch.move(0, 1);
     else if (k === K.LEFT) { if (!E || E.area !== 'channels') setArea('cats'); }
     else if (k === K.RIGHT) {
@@ -574,6 +584,10 @@ Live.show = function (arg) {
   root.classList.remove('hidden'); root.classList.remove('overlay');
   $('lvPrev').style.display = S.pick ? 'none' : '';
   $('lvInfo').style.display = S.pick ? 'none' : '';
+  if (S.searching) {            /* opening the channels again: without the old search */
+    var back = S.preSearch; S.searching = false; S.qh = ''; $('lvCatQ').value = '';
+    if (back && S.cats.length) { loadList(back, false); }
+  }
   if (!S.cats.length) {
     S.loading = true; drawCh();
     D.getCats('live', function () {

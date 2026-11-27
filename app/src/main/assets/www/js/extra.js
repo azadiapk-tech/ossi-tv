@@ -199,12 +199,14 @@ O.logout = function () {
    Fire TV has no Arabic system keyboard, so on TVs the search boxes use this one: Arabic + German, moved with the arrows. */
 var OSK = O.osk = {};
 var KB = { el: null, inp: null, lang: 'ar', r: 1, c: 0 };
+/* rows are written in screen order (left -> right). Arabic = the usual Arabic keyboard: ض at the right end. */
+function rv(a) { return a.slice().reverse(); }
 var LAY = {
   ar: [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
-       ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'],
-       ['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك', 'ط'],
-       ['ذ', 'ئ', 'ء', 'ؤ', 'ر', 'ى', 'ة', 'و', 'ز', 'ظ', 'د'],
-       ['أ', 'إ', 'آ', 'لا', '-', '.', ':']],
+       rv(['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج', 'د']),
+       rv(['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك', 'ط']),
+       rv(['ئ', 'ء', 'ؤ', 'ر', 'لا', 'ى', 'ة', 'و', 'ز', 'ظ', 'ذ']),
+       rv(['أ', 'إ', 'آ', '-', '.', ':'])],
   de: [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'ß'],
        ['q', 'w', 'e', 'r', 't', 'z', 'u', 'i', 'o', 'p', 'ü'],
        ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'ö', 'ä'],
@@ -217,7 +219,7 @@ function kLabel(k) {
   return { lang: KB.lang === 'ar' ? 'Deutsch' : 'عربي', space: t('oskSpace'), bs: '⌫', clear: t('oskClear'), done: t('oskDone') }[k.a];
 }
 function kDraw() {
-  var R = kRows(), dir = KB.lang === 'ar' ? 'rtl' : 'ltr';
+  var R = kRows(), dir = 'ltr';
   var h = '<div class="osk-txt" dir="auto">' + esc(KB.inp.value) + '<i class="osk-caret"></i></div>';
   R.forEach(function (row, ri) {
     h += '<div class="osk-row' + (ri === R.length - 1 ? ' bot' : '') + '" dir="' + dir + '">';
@@ -240,9 +242,15 @@ function kPress(k) {
   else if (k.a === 'space') kType(v + ' ');
   else if (k.a === 'bs') kType(v.slice(0, -1));
   else if (k.a === 'clear') kType('');
-  else if (k.a === 'lang') { KB.lang = KB.lang === 'ar' ? 'de' : 'ar'; O.cfg.set('oskLang', KB.lang); KB.r = kRows().length - 1; KB.c = 0; kDraw(); }
+  else if (k.a === 'lang') { KB.lang = KB.lang === 'ar' ? 'de' : 'ar'; O.cfg.set('oskLang', KB.lang); KB.r = kRows().length - 1; kDraw(); }
   else if (k.a === 'done') OSK.close();
 }
+/* TV: search boxes are read-only, so the system keyboard can never pop up over the app's own one */
+setInterval(function () {
+  if (O.isTouch()) return;
+  var l = document.querySelectorAll('input.srch:not([readonly])');
+  for (var i = 0; i < l.length; i++) { l[i].setAttribute('readonly', 'readonly'); l[i].setAttribute('inputmode', 'none'); }
+}, 1000);
 OSK.isOpen = function () { return !!KB.inp; };
 OSK.open = function (inp) {
   if (!inp) return;
@@ -253,7 +261,7 @@ OSK.open = function (inp) {
       KB.r = +b.getAttribute('data-r'); KB.c = +b.getAttribute('data-c'); kPress(kRows()[KB.r][KB.c]);
     });
   }
-  KB.inp = inp; KB.lang = O.cfg.get('oskLang', 'ar'); KB.r = 1; KB.c = 0;
+  KB.inp = inp; KB.lang = O.cfg.get('oskLang', 'ar'); KB.r = 1; KB.c = KB.lang === 'ar' ? LAY.ar[1].length - 1 : 0;   /* start on ض / q */
   inp.classList.add('osk-on');
   KB.el.classList.remove('hidden'); kDraw();
 };
@@ -263,9 +271,9 @@ OSK.close = function () {
   if (KB.el) { KB.el.classList.add('hidden'); KB.el.innerHTML = ''; }
 };
 OSK.onKey = function (e, k) {
-  var R = kRows(), row = R[KB.r], rtl = KB.lang === 'ar';
-  if (k === K.LEFT) KB.c = O.clamp(KB.c + (rtl ? 1 : -1), 0, row.length - 1);
-  else if (k === K.RIGHT) KB.c = O.clamp(KB.c + (rtl ? -1 : 1), 0, row.length - 1);
+  var R = kRows(), row = R[KB.r];
+  if (k === K.LEFT) KB.c = O.clamp(KB.c - 1, 0, row.length - 1);
+  else if (k === K.RIGHT) KB.c = O.clamp(KB.c + 1, 0, row.length - 1);
   else if (k === K.UP || k === K.DOWN) {
     var nr = O.clamp(KB.r + (k === K.UP ? -1 : 1), 0, R.length - 1);
     if (nr !== KB.r) { var f = row.length > 1 ? KB.c / (row.length - 1) : 0; KB.r = nr; KB.c = Math.round(f * (R[nr].length - 1)); }
@@ -281,7 +289,7 @@ OSK.onKey = function (e, k) {
 /* search boxes: TV -> the app keyboard, phone / PC -> the normal keyboard */
 O.searchKb = function (inp) {
   if (!inp) return;
-  if (O.isTouch()) { inp.focus(); return; }
+  if (O.isTouch()) { inp.removeAttribute('readonly'); inp.focus(); return; }
   OSK.open(inp);
 };
 

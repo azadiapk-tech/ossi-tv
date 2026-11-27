@@ -8,7 +8,7 @@ var cur = null;
 O.app = {
   go: function (name, arg) {
     if (cur && scr[cur] && scr[cur].hide) scr[cur].hide();
-    cur = name; scr[name].show(arg);
+    O.app.prev = cur; cur = name; scr[name].show(arg);
   },
   back: function () { O.app.go(parent[cur] || 'home'); },
   setParent: function (k, v) { parent[k] = v; },
@@ -41,6 +41,9 @@ O.app = {
 var NAT = window.OssiNative || null, kbLast = 0;
 /* TV remotes: open the on-screen keyboard only when the user presses OK on a text field (never automatically) */
 O.kb = function () {
+  /* search boxes on a TV never use the system keyboard (Fire TV has no Arabic): the app's own one instead */
+  var ae = document.activeElement;
+  if (ae && ae.classList && ae.classList.contains('srch') && !O.isTouch()) { ae.blur(); if (NAT && NAT.hideKeyboard) NAT.hideKeyboard(); O.searchKb(ae); return; }
   if (!NAT || !NAT.showKeyboard || Date.now() - kbLast < 1500) return;
   kbLast = Date.now(); NAT.showKeyboard();
 };

@@ -567,11 +567,11 @@ html:not(.touch) .moving .ch.sel,html:not(.touch) .moving .cat.sel,html:not(.tou
 #modal{background:rgba(2,3,16,.42)}
 #modal.light{background:rgba(2,3,16,.12)}
 /* the app's own search keyboard (TV) */
-#osk{position:absolute;left:calc((var(--W,1920px) - 1240px) / 2);bottom:16px;width:1240px;padding:18px 20px 22px;box-sizing:border-box;border-radius:26px;background:rgba(10,14,44,.98);border:1px solid rgba(120,140,255,.35);box-shadow:0 10px 50px rgba(0,0,0,.6);z-index:70}
+#osk{position:absolute;left:calc(576px + (var(--W,1920px) - 576px - 1180px) / 2);bottom:16px;width:1180px;padding:18px 20px 22px;box-sizing:border-box;border-radius:26px;background:rgba(10,14,44,.98);border:1px solid rgba(120,140,255,.35);box-shadow:0 10px 50px rgba(0,0,0,.6);z-index:70}
 .osk-txt{height:64px;line-height:64px;font-size:34px;padding:0 22px;border-radius:16px;background:rgba(255,255,255,.08);color:#fff;margin-bottom:12px;overflow:hidden;white-space:nowrap}
 .osk-caret{display:inline-block;width:3px;height:38px;background:#22d3ee;vertical-align:middle;margin:0 4px}
 .osk-row{display:flex;justify-content:center;margin-top:8px}
-.osk-row .ky{flex:0 0 94px;height:64px;line-height:64px;margin:0 4px;border-radius:14px;background:rgba(255,255,255,.09);color:#fff;font-size:32px;text-align:center;font-weight:600;font-style:normal}
+.osk-row .ky{flex:0 0 84px;height:62px;line-height:62px;margin:0 4px;border-radius:14px;background:rgba(255,255,255,.09);color:#fff;font-size:32px;text-align:center;font-weight:600;font-style:normal}
 .osk-row .ky.focus{background:linear-gradient(135deg,#22d3ee,#8b5cf6);transform:scale(1.08)}
 .osk-row.bot{margin-top:14px}
 .osk-row.bot .ky{flex:0 0 150px;font-size:26px}
@@ -595,3 +595,9 @@ html:not(.touch) .live:not(.overlay) .lv-hint{bottom:8px}
 #clock{position:absolute;left:250px;top:34px;z-index:66;padding:6px 18px;border-radius:14px;background:rgba(6,9,32,.72);color:#fff;font-size:40px;font-weight:700;letter-spacing:2px;font-variant-numeric:tabular-nums;pointer-events:none}
 #clock.inpl{left:36px;top:26px;font-size:36px;background:rgba(0,0,0,.45)}
 html.pip #clock{display:none!important}
+
+/* one search box per screen */
+#lvCatS{width:520px}
+/* the channel list uses the place of the removed second search box */
+.live:not(.overlay) #lvChs{top:140px;height:940px}
+html:not(.touch) .live:not(.overlay) #lvChs{height:870px}

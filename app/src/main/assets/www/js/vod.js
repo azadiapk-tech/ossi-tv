@@ -63,10 +63,9 @@ function makeVod(type, rootId) {
     root = $(rootId);
     root.innerHTML =
       '<div class="hdr"></div>' + O.brandBack(t(type === 'movie' ? 'movies' : 'series')) +
-      '<div class="sbox vd-search">' + O.ic.search + '<input class="vq" placeholder="' + esc(t(type === 'movie' ? 'searchMovies' : 'searchSeries')) + '"></div>' +
       '<div class="hbtn" data-go="home" style="left:1700px;margin-left:var(--X,0px)">' + O.ic.home + '</div><div class="hbtn" data-go="settings" style="left:1790px;margin-left:var(--X,0px)">' + O.ic.gear + '</div>' +
       '<div class="pane lv-cats" style="background:rgba(4,10,26,.55)"></div>' +
-      '<div class="sbox vcs" style="left:20px;top:140px;width:520px">' + O.ic.search + '<input class="vc" placeholder="' + esc(t('searchCat')) + '"></div>' +
+      '<div class="sbox vcs" style="left:20px;top:140px;width:520px">' + O.ic.search + '<input class="vc srch" placeholder="' + esc(t(type === 'movie' ? 'searchMovies' : 'searchSeries')) + '"></div>' +
       '<div class="lv-list vd-cats"></div><div class="lv-list vd-grid"></div>' +
       '<div class="hints"><span><i class="kd w"></i>OK</span><span><i class="kd y"></i>' + esc(t('hFav')) + '</span><span>☰  ' + esc(t('eTitle2')) + '</span></div>' +
       '<div class="editbar hidden vd-edit"></div>' +
@@ -96,11 +95,9 @@ function makeVod(type, rootId) {
       var g = e.target.closest && e.target.closest('[data-go]');
       if (g) O.app.go(g.getAttribute('data-go'));
     });
-    q('.vq').addEventListener('input', function () {
-      clearTimeout(searchT); searchT = setTimeout(function () { S.qh = q('.vq').value.toLowerCase().replace(/^\s+|\s+$/g, ''); applyView(); G.grid.reset(); drawGrid(); }, 200);
-    });
+    /* one search box: searches ALL movies / series (not the packages) */
     q('.vc').addEventListener('input', function () {
-      clearTimeout(searchT); searchT = setTimeout(function () { S.qc = q('.vc').value.toLowerCase().replace(/^\s+|\s+$/g, ''); filterCats(); G.cats.reset(); }, 200);
+      clearTimeout(searchT); searchT = setTimeout(function () { globalSearch(q('.vc').value.toLowerCase().replace(/^\s+|\s+$/g, '')); }, 300);
     });
     built = true;
   }
@@ -133,9 +130,21 @@ function makeVod(type, rootId) {
     S.catView = qq ? S.cats.filter(function (c) { return c.name.toLowerCase().indexOf(qq) > -1; }) : S.cats;
   }
   function onCatOk() { var c = S.catView[G.cats.cur]; if (c) openCat(c, true); }
+  function globalSearch(qv) {
+    if (!qv) { if (S.searching) { var back = S.preSearch; S.searching = false; if (back) loadList(back, false); } return; }
+    if (!S.searching) { S.searching = true; S.preSearch = S.cur; }
+    var tk = ++S.tok;
+    S.cur = { id: 'search', name: t(type === 'movie' ? 'searchMovies' : 'searchSeries'), type: 'search' };
+    S.loading = !(D.vodAll && D.vodAll[type]); if (S.loading) { S.all = []; S.view = []; drawGrid(); }
+    D.getAllVod(type, function (list) {
+      if (tk !== S.tok) return;
+      S.loading = false; S.err = null; S.all = list; S.qh = qv; applyView();
+      G.grid.reset(); drawGrid(); G.cats.draw();
+    }, function (err) { if (tk !== S.tok) return; S.loading = false; S.err = err; drawGrid(); });
+  }
   function openCat(entry, toGrid) { O.par.guard(type, entry, function () { loadList(entry, toGrid); }); }
   function loadList(entry, toGrid, keep) {
-    S.cur = entry; S.retry = null; S.qh = ''; q('.vq').value = '';
+    S.cur = entry; S.retry = null; S.qh = ''; S.searching = false; q('.vc').value = '';
     O.store.ps('last.' + type, { cat: entry.id });
     var tk = ++S.tok;
     if (entry.type === 'recent') { setAll(O.recent.list(type), toGrid, keep); return; }
@@ -167,7 +176,6 @@ function makeVod(type, rootId) {
     S.area = a;
     G.cats.setActive(a === 'cats'); G.grid.setActive(a === 'grid');
     q('.vcs').classList.toggle('focus', a === 'catSearch');
-    q('.vd-search').classList.toggle('focus', a === 'hdrSearch');
   }
   function toggleFav(c) {
     var keep = G.grid.cur, on = O.fav.toggle(type, slimItem(c));
@@ -309,9 +317,7 @@ function makeVod(type, rootId) {
     if (k === K.BACK || k === K.ESC) { O.app.back(); e.preventDefault(); return true; }
     if (k === K.YELLOW) { if (a === 'grid' && S.view[G.grid.cur]) toggleFav(S.view[G.grid.cur]); e.preventDefault(); return true; }
     if (a === 'catSearch') {
-      if (k === K.DOWN) setArea('cats'); else if (k === K.ENTER) O.searchKb(q('.vc')); else if (k === K.UP || k === K.RIGHT) setArea('hdrSearch'); else used = false;
-    } else if (a === 'hdrSearch') {
-      if (k === K.DOWN) setArea('grid'); else if (k === K.LEFT) setArea('catSearch'); else if (k === K.ENTER) O.searchKb(q('.vq')); else used = false;
+      if (k === K.DOWN) setArea('cats'); else if (k === K.ENTER) O.searchKb(q('.vc')); else if (k === K.RIGHT) { if (S.view.length) setArea('grid'); } else used = false;
     } else if (a === 'cats') {
       if (k === K.UP) { if (!G.cats.move(0, -1)) setArea('catSearch'); }
       else if (k === K.DOWN) G.cats.move(0, 1);
@@ -320,7 +326,7 @@ function makeVod(type, rootId) {
       else if (k === K.PGUP || k === K.CHDN) G.cats.page(-1); else if (k === K.PGDN || k === K.CHUP) G.cats.page(1);
       else used = false;
     } else {
-      if (k === K.UP) { if (!G.grid.move(0, -1)) setArea('hdrSearch'); }
+      if (k === K.UP) { if (!G.grid.move(0, -1)) setArea('catSearch'); }
       else if (k === K.DOWN) G.grid.move(0, 1);
       else if (k === K.LEFT) { if (!G.grid.move(-1, 0)) setArea('cats'); }
       else if (k === K.RIGHT) G.grid.move(1, 0);
@@ -343,6 +349,10 @@ function makeVod(type, rootId) {
         if (!ent) ent = S.cats[2] || S.cats[1];
         G.cats.draw(); openCat(ent, true);
       }, function (err) { S.loading = false; S.err = err; drawGrid(); S.retry = function () { S.err = null; scr.show(); }; });
+    } else if (S.searching && O.app.prev !== 'detail') {
+      /* coming back from the home screen: start fresh, without the old search */
+      var back = S.preSearch; S.searching = false; q('.vc').value = '';
+      if (back) loadList(back, true); else { refreshCounts(); G.cats.draw(); drawGrid(); }
     } else {
       refreshCounts(); G.cats.draw(); drawGrid(); setArea(S.view.length ? 'grid' : 'cats');
     }
