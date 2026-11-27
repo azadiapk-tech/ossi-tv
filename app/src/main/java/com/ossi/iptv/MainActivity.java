@@ -404,22 +404,37 @@ public class MainActivity extends Activity {
             speedStop();
             final int run = ++speedRun;
             final java.util.concurrent.atomic.AtomicLong bytes = new java.util.concurrent.atomic.AtomicLong();
+            final String[] lastErr = { "" };
+            /* several public test files: if one server refuses, the next one is used */
+            final String[] urls = {
+                "https://speed.cloudflare.com/__down?bytes=25000000",
+                "https://proof.ovh.net/files/100Mb.dat",
+                "http://speedtest.tele2.net/100MB.zip",
+                "https://ash-speed.hetzner.com/100MB.bin"
+            };
             final long t0 = android.os.SystemClock.elapsedRealtime(), end = t0 + Math.max(4, Math.min(seconds, 15)) * 1000L;
             for (int k = 0; k < 4; k++) {
+                final int start = k;
                 new Thread(new Runnable() { @Override public void run() {
                     byte[] buf = new byte[64 * 1024];
-                    while (speedRun == run && android.os.SystemClock.elapsedRealtime() < end) {
+                    int u = start % urls.length, fails = 0;
+                    while (speedRun == run && android.os.SystemClock.elapsedRealtime() < end && fails < 12) {
                         java.net.HttpURLConnection c = null;
                         try {
-                            c = (java.net.HttpURLConnection) new java.net.URL("https://speed.cloudflare.com/__down?bytes=100000000").openConnection();
-                            c.setConnectTimeout(8000); c.setReadTimeout(8000);
-                            c.setRequestProperty("User-Agent", "OssiTV");
+                            c = (java.net.HttpURLConnection) new java.net.URL(urls[u]).openConnection();
+                            c.setConnectTimeout(6000); c.setReadTimeout(6000);
+                            c.setInstanceFollowRedirects(true);
+                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) OssiTV");
+                            int code = c.getResponseCode();
+                            if (code < 200 || code >= 300) throw new java.io.IOException("HTTP " + code);
                             java.io.InputStream in = c.getInputStream();
                             int n;
                             while (speedRun == run && android.os.SystemClock.elapsedRealtime() < end && (n = in.read(buf)) > 0) bytes.addAndGet(n);
                             in.close();
                         } catch (Exception e) {
-                            try { Thread.sleep(300); } catch (InterruptedException ignored) { }
+                            lastErr[0] = String.valueOf(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                            fails++; u = (u + 1) % urls.length;
+                            try { Thread.sleep(200); } catch (InterruptedException ignored) { }
                         } finally { if (c != null) c.disconnect(); }
                     }
                 } }).start();
@@ -432,7 +447,9 @@ public class MainActivity extends Activity {
                     if (startAt == 0) { if (b > 0) { startAt = now; startBytes = b; } }   /* skip the connection setup */
                     boolean done = now >= end;
                     double mbps = startAt > 0 && now > startAt ? (b - startBytes) * 8.0 / ((now - startAt) / 1000.0) / 1e6 : 0;
-                    js("window.__ossiSpeed&&__ossiSpeed(" + String.format(java.util.Locale.ROOT, "%.2f", mbps) + "," + (done ? 1 : 0) + "," + (b > 0 ? 1 : 0) + ")");
+                    String err = lastErr[0].replace("\\", "").replace("'", "").replace("\n", " ");
+                    if (err.length() > 60) err = err.substring(0, 60);
+                    js("window.__ossiSpeed&&__ossiSpeed(" + String.format(java.util.Locale.ROOT, "%.2f", mbps) + "," + (done ? 1 : 0) + "," + (b > 0 ? 1 : 0) + ",'" + err + "')");
                     if (done) { if (speedRun == run) speedRun++; break; }
                 }
             } }).start();

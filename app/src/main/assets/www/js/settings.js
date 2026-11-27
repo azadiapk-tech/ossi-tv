@@ -245,9 +245,9 @@ function speedTest() {
   }
   var t0 = Date.now();
   O.getJSON(O.api.url('', ''), function () { ping = Date.now() - t0; }, function () {}, 0);
-  window.__ossiSpeed = function (mbps, fin, any) {
+  window.__ossiSpeed = function (mbps, fin, any, err) {
     if (done) return;
-    if (fin) { if (!any) { stop(); M.setMsg(t('testFail')); return; } stop(); show(+mbps || 0, true); }
+    if (fin) { if (!any) { stop(); M.setMsg(t('testFail') + (err ? '\n(' + err + ')' : '')); return; } stop(); show(+mbps || 0, true); }
     else if (mbps > 0) show(+mbps, false);
   };
   if (NAT && NAT.speedTest) { NAT.speedTest(10); return; }
@@ -256,7 +256,7 @@ function speedTest() {
   function worker() {
     if (done || Date.now() >= end) return;
     var ac = new AbortController(); ctrls.push(ac);
-    fetch('https://speed.cloudflare.com/__down?bytes=100000000', { signal: ac.signal, cache: 'no-store' }).then(function (r) {
+    fetch('https://speed.cloudflare.com/__down?bytes=25000000', { signal: ac.signal, cache: 'no-store' }).then(function (r) {
       var rd = r.body.getReader();
       function pump() {
         return rd.read().then(function (x) {

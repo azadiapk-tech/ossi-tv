@@ -40,7 +40,8 @@ function render() {
   var r = rootEl();
   if (!cur) { r.classList.add('hidden'); r.innerHTML = ''; return; }
   r.classList.remove('hidden');
-  r.classList.toggle('light', !!cur.light);   /* light backdrop: the picture stays visible behind the menu */
+  r.classList.toggle('light', !!cur.light);
+  r.classList.toggle('cf', !!cur.confirm);   /* light backdrop: the picture stays visible behind the menu */
   if (cur.build) cur.rows = cur.build();
   var h = '<div class="mbox"><h2 dir="auto">' + esc(cur.title) + '</h2>';
   if (cur.msg) h += '<div class="mmsg">' + esc(cur.msg) + '</div>';
@@ -56,7 +57,7 @@ function render() {
     h += '</div>';
   }
   if (cur.rows) {
-    h += '<div class="mrows">';
+    h += '<div class="mrows' + (cur.confirm ? ' yn' : '') + '"' + (cur.confirm ? ' dir="' + (O.lang() === 'ar' ? 'rtl' : 'ltr') + '"' : '') + '>';
     cur.rows.forEach(function (row, i) {
       h += '<div class="mr' + (row.dis ? ' dis' : '') + '" data-i="' + i + '"><span class="ml" dir="auto">' + esc(row.label) + '</span>';
       if (row.input) h += '<input data-k="' + esc(row.key) + '" type="' + (row.type || 'text') + '" value="' + esc(row.value || '') + '">';
@@ -99,7 +100,7 @@ M.list = function (title, build, opts) {
 };
 M.confirm = function (title, msg, yes, no, defNo) {
   M.open({
-    title: title, msg: msg, idx: defNo ? 1 : 0,
+    title: title, msg: msg, idx: defNo ? 1 : 0, confirm: true,
     rows: [
       { label: O.t('yes'), onOk: function () { M.close(); if (yes) yes(); } },
       { label: O.t('no'), onOk: function () { M.close(); if (no) no(); } }
@@ -133,6 +134,10 @@ M.onKey = function (e, k) {
     else if (k === K.BS) pinPress('b');
     else if (k === K.BACK || k === K.ESC) M.close();
     e.preventDefault(); return true;
+  }
+  if (cur.confirm && (k === K.LEFT || k === K.RIGHT)) {        /* yes / no side by side */
+    var toNo = (k === K.LEFT) === (O.lang() === 'ar');
+    cur.idx = toNo ? 1 : 0; paint(); e.preventDefault(); return true;
   }
   if (k === K.UP || k === K.DOWN) {
     var n = cur.rows.length, i = cur.idx, d = k === K.UP ? -1 : 1, g = 0;

@@ -166,7 +166,7 @@ var T = {
   tTime: ['صيغة الوقت', 'TIME FORMAT', 'ZEITFORMAT'],
   tLang: ['لغة التطبيق', 'APP LANGUAGE', 'APP SPRACHE'],
   tCache: ['مسح الذاكرة', 'Clear cache', 'Cache leeren'],
-  tSpeed: ['اختبار السرعة', 'Speed test', 'Geschwindigkeitstest'],
+  tSpeed: ['اختبار سرعة الإنترنت', 'Internet speed test', 'Internet-Speedtest'],
   tMulti: ['شاشات متعددة', 'Multi-Screen', 'Multi-Screen'],
   tPreview: ['معاينة القناة', 'Channel preview', 'Kanalvorschau'],
   tAbout: ['حول التطبيق', 'About', 'Info'],

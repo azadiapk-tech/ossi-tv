@@ -388,8 +388,7 @@ var DT = O.detail = {};
       '<div class="dt-poster" id="dtPoster"></div><div class="dt-btns" id="dtBtns"></div>' +
       '<div class="dt-title ttl" id="dtTitle" dir="auto"></div><div class="dt-meta" id="dtMeta" dir="auto"></div>' +
       '<div class="dt-crew" id="dtCrew"></div><div class="dt-plot" id="dtPlot" dir="auto"></div>' +
-      '<div class="dt-seasons" id="dtSeasons"></div><div id="dtEps"></div>' +
-      '<div class="hints"><span><i class="kd w"></i>OK</span><span><i class="kd y"></i>' + esc(t('hFav')) + '</span></div>';
+      '<div class="dt-seasons" id="dtSeasons"></div><div id="dtEps"></div>';
     grid = new O.VGrid($('dtEps'), {
       cols: 1, itemH: 80, gap: 8, render: epRow, count: function () { return curEps().length; },
       onClick: function (i) { setArea('eps'); playEp(S.si, i); }
