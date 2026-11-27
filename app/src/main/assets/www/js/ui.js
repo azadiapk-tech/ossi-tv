@@ -28,6 +28,13 @@ O.numKey = function (d, cb) {
 O.isTouch = function () { return document.documentElement.className.indexOf('touch') > -1; };
 var M = O.modal = {};
 var stack = [], cur = null, root = null;
+var PINK = [1, 2, 3, 4, 5, 6, 7, 8, 9, 'b', 0, 'ok'];
+function pinPress(k) {
+  if (k === 'b') { cur.buf = cur.buf.slice(0, -1); render(); return; }
+  if (k === 'ok') { if (cur.buf.length === 4) { var cb0 = cur.onDone, p0 = cur.buf; M.close(); setTimeout(function () { cb0(p0); }, 0); } return; }
+  cur.buf += k; render();
+  if (cur.buf.length === 4) { var cb = cur.onDone, p = cur.buf; M.close(); setTimeout(function () { cb(p); }, 0); }
+}
 function rootEl() { return root || (root = $('modal')); }
 function render() {
   var r = rootEl();
@@ -41,13 +48,12 @@ function render() {
     h += '<div class="pindots">';
     for (var d = 0; d < 4; d++) h += '<i class="' + (d < cur.buf.length ? 'on' : '') + '"></i>';
     h += '</div>';
-    if (O.isTouch()) {
-      h += '<div class="pinpad">';
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 'x', 0, 'b'].forEach(function (k) {
-        h += k === 'x' ? '<span></span>' : '<b data-d="' + k + '">' + (k === 'b' ? '⌫' : k) + '</b>';
-      });
-      h += '</div>';
-    }
+    /* number pad (phone: tap, TV remote: arrows + OK) — Fire TV remotes have no number keys */
+    h += '<div class="pinpad">';
+    PINK.forEach(function (k, i) {
+      h += '<b data-d="' + k + '"' + (!O.isTouch() && i === (cur.pk || 0) ? ' class="focus"' : '') + '>' + (k === 'b' ? '⌫' : k === 'ok' ? 'OK' : k) + '</b>';
+    });
+    h += '</div>';
   }
   if (cur.rows) {
     h += '<div class="mrows">';
@@ -119,11 +125,12 @@ M.form = function (title, fields, onSave) {
 M.onKey = function (e, k) {
   if (!cur) return false;
   if (cur.type === 'pin') {
-    var dg = (k >= 48 && k <= 57) ? k - 48 : (k >= 96 && k <= 105 ? k - 96 : -1);
-    if (dg > -1) {
-      cur.buf += dg; render();
-      if (cur.buf.length === 4) { var cb = cur.onDone, p = cur.buf; M.close(); setTimeout(function () { cb(p); }, 0); }
-    } else if (k === K.BS || k === K.LEFT) { cur.buf = cur.buf.slice(0, -1); render(); }
+    var dg = (k >= 48 && k <= 57) ? k - 48 : (k >= 96 && k <= 105 ? k - 96 : -1), pk = cur.pk || 0;
+    if (dg > -1) pinPress(dg);
+    else if (k === K.LEFT || k === K.RIGHT) { cur.pk = Math.floor(pk / 3) * 3 + (pk % 3 + (k === K.RIGHT ? 1 : 2)) % 3; render(); }
+    else if (k === K.UP || k === K.DOWN) { cur.pk = (pk + (k === K.DOWN ? 3 : 9)) % 12; render(); }
+    else if (k === K.ENTER) pinPress(PINK[pk]);
+    else if (k === K.BS) pinPress('b');
     else if (k === K.BACK || k === K.ESC) M.close();
     e.preventDefault(); return true;
   }
@@ -139,7 +146,7 @@ document.addEventListener('click', function (e) {
   if (cur && e.target === rootEl()) { if (cur.onBack) cur.onBack(); else M.close(); return; }
   if (cur && cur.type === 'pin') {
     var pd = e.target.closest && e.target.closest('[data-d]');
-    if (pd) { var v = pd.getAttribute('data-d'); M.onKey({ preventDefault: function () {} }, v === 'b' ? K.BS : 48 + parseInt(v, 10)); }
+    if (pd) { var v = pd.getAttribute('data-d'); pinPress(v === 'b' || v === 'ok' ? v : parseInt(v, 10)); }
     return;
   }
   if (!cur || !cur.rows) return;
@@ -337,6 +344,15 @@ function setAspect(m) {
   var l = $('pcAsp'); if (l) l.textContent = aspLabel();
   O.toast(O.t('aspect') + ': ' + aspLabel());
 }
+function dimLabel() { var n = O.cfg.get('dim', 0); return n ? O.t('dimLvl') + ' ' + n : O.t('off'); }
+/* a black layer over the video: level 1..5 = 10, 30, 50, 70, 90 % darker */
+function applyDim() {
+  var el = $('pDim');
+  if (!el) { el = document.createElement('div'); el.id = 'pDim'; var pl = $('player'); if (!pl) return; pl.insertBefore(el, pl.firstChild); }
+  var n = O.cfg.get('dim', 0);
+  el.style.opacity = n ? [0, .1, .3, .5, .7, .9][n] : 0;
+}
+O.applyDim = applyDim;
 function aspLabel() { return O.t('asp_' + O.player.aspect()); }
 function previewAspect(m) {
   O.player.setAspectMode(m);
@@ -376,6 +392,17 @@ Pui.menu = function () {
       });
     }, { idx: Math.max(0, Pl.ASPECTS.indexOf(Pl.aspect())), light: true, onBack: function () { M.closeAll(); setAspect(Pl.aspect()); } });
   } });
+  /* picture dimming: off + 5 levels (10 % ... 90 % darker); focus previews, OK / BACK keeps it */
+  rows.push({ label: O.t('dimOpt'), value: dimLabel(), onOk: function () {
+    var keep = O.cfg.get('dim', 0);
+    M.list(O.t('dimOpt'), function () {
+      return [0, 1, 2, 3, 4, 5].map(function (n) {
+        return { label: n ? O.t('dimLvl') + ' ' + n : O.t('off'), value: O.cfg.get('dim', 0) === n ? '✓' : '',
+          onFocus: function () { O.cfg.set('dim', n); applyDim(); M.refresh(); },
+          onOk: function () { O.cfg.set('dim', n); applyDim(); M.closeAll(); } };
+      });
+    }, { idx: keep, light: true, onBack: function () { M.closeAll(); } });
+  } });
   rows.push({ label: O.t('clockOpt'), value: O.t(O.clock.on() ? 'on' : 'off'), onOk: function (row) { O.clock.toggle(); row.value = O.t(O.clock.on() ? 'on' : 'off'); M.refresh(); } });
   rows.push({ label: O.t('tSleep'), value: O.sleep && O.sleep.end ? Math.ceil(O.sleep.left() / 60000) + ' ' + O.t('minutes') : '', onOk: function () { O.sleep.menu(); } });
   M.list(O.t('options'), function () { return rows; }, { light: true });
@@ -399,6 +426,7 @@ Pui.tracks = function (kind) {
   });
 };
 Pui.enter = function (kind, handlers) {
+  setTimeout(applyDim, 0); setTimeout(function () { if (O.clock) O.clock.tick(); }, 0);
   Pui.active = true; Pui.kind = kind; Pui.h = handlers || {};
   buildCtl(); Pui.touch(true);
   if (NAT && NAT.setPip) NAT.setPip(true);
@@ -411,6 +439,7 @@ Pui.enter = function (kind, handlers) {
   Pui.refresh();
 };
 Pui.exit = function () {
+  setTimeout(function () { if (O.clock) O.clock.tick(); }, 0);
   Pui.cancelNext();
   if (NAT && NAT.setPip) NAT.setPip(false);
   if (NAT && briSet) { NAT.setBrightness(-1); briSet = false; }

@@ -19,8 +19,8 @@ var ICONS = {
   about: svg('<circle cx="32" cy="32" r="27" fill="none" stroke="#8fb2ff" stroke-width="5"/><circle cx="32" cy="19" r="3.5" fill="#8fb2ff"/><path d="M32 29v18" stroke="#8fb2ff" stroke-width="6" stroke-linecap="round"/>')
 };
 var TILES = [
-  ['par', 'tParental'], ['pls', 'tPlaylists'], ['upd', 'tUpdate'], ['time', 'tTime'], ['lang', 'tLang'],
-  ['cache', 'tCache'], ['speed', 'tSpeed'], ['prev', 'tPreview'], ['sleep', 'tSleep'], ['appupd', 'tAppUpd'], ['about', 'tAbout']
+  ['appupd', 'tAppUpd'], ['upd', 'tUpdate'], ['par', 'tParental'], ['time', 'tTime'], ['lang', 'tLang'],
+  ['cache', 'tCache'], ['speed', 'tSpeed'], ['prev', 'tPreview'], ['sleep', 'tSleep'], ['pls', 'tPlaylists'], ['about', 'tAbout']
 ];
 var Set = O.settings = {}, root, built = false, idx = 0;
 

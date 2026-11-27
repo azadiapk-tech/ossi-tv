@@ -9,6 +9,7 @@ O.app = {
   go: function (name, arg) {
     if (cur && scr[cur] && scr[cur].hide) scr[cur].hide();
     O.app.prev = cur; cur = name; scr[name].show(arg);
+    if (O.clock) O.clock.tick();   /* the clock follows the screen at once */
   },
   back: function () { O.app.go(parent[cur] || 'home'); },
   setParent: function (k, v) { parent[k] = v; },
