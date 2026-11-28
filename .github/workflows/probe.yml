@@ -5,29 +5,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          UA='Mozilla/5.0 (Linux; Android 14; SM-S928B Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0 Mobile Safari/537.36'
-          echo "== gtx"; curl -s -o /dev/null -w "%{http_code}\n" -A "$UA" -H "Origin: null" "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=Hello%20world"
-          curl -s -A "$UA" "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=Hello%20world" | head -c 300; echo
-          curl -s -I -A "$UA" -H "Origin: null" "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=Hello" | grep -i "access-control\|content-type"
-          echo "== dict"; curl -s -A "$UA" "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=ar&q=Hello%20world" | head -c 300; echo
-          echo "== 365 allscores"
-          curl -s -A "$UA" "https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=27&timezoneName=Europe/Berlin&userCountryId=80&sports=1&startDate=28/11/2026&endDate=28/11/2026&showOdds=false" > all.json; wc -c all.json
+          UA='Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36'
+          B="appTypeId=5&langId=27&timezoneName=Asia/Riyadh&userCountryId=131"
+          curl -s -A "$UA" "https://webws.365scores.com/web/games/allscores/?$B&sports=1&startDate=28/11/2026&endDate=29/11/2026&showOdds=false" > all.json
           python3 - <<'PY'
           import json
-          d=json.load(open('all.json'))
-          print('keys',list(d.keys())[:20])
-          g=d.get('games',[])
-          print('games',len(g))
-          if g:
-              x=g[0]; print('game keys',sorted(x.keys()))
-              print(json.dumps({k:x[k] for k in x if k in ('id','competitionId','competitionDisplayName','homeCompetitor','awayCompetitor','tvNetworks','statusText','startTime')},ensure_ascii=False)[:1500])
-              tv=[y for y in g if y.get('tvNetworks')]
-              print('with tv',len(tv))
-              if tv: print(json.dumps(tv[0]['tvNetworks'],ensure_ascii=False)[:800]); print(tv[0]['homeCompetitor']['name'],tv[0]['awayCompetitor']['name'],tv[0].get('competitionDisplayName'))
-          c=d.get('competitions',[])
-          print('competitions sample',[ (y.get('id'),y.get('name')) for y in c[:40]])
+          d=json.load(open('all.json'));g=d['games']
+          top=[x for x in g if x['competitionId'] in (25,11,7,17,35,649)]
+          print('top',len(top),'hasTV',sum(1 for x in top if x.get('hasTVNetworks')))
+          x=top[0] if top else g[0]
+          print(json.dumps({k:x[k] for k in ('id','competitionId','startTime','statusGroup','statusText','gameTimeDisplay','hasTVNetworks') if k in x},ensure_ascii=False))
+          print(json.dumps(x['homeCompetitor'],ensure_ascii=False)[:600])
+          open('ids','w').write(' '.join(str(y['id']) for y in top if y.get('hasTVNetworks'))[:200])
           PY
-          echo "== game detail"
-          GID=$(python3 -c "import json;g=json.load(open('all.json')).get('games',[]);print(g[0]['id'] if g else '')")
-          curl -s -A "$UA" "https://webws.365scores.com/web/game/?appTypeId=5&langId=27&timezoneName=Europe/Berlin&userCountryId=80&gameId=$GID" > g.json; wc -c g.json
-          python3 -c "import json;d=json.load(open('g.json'));g=d.get('game',{});print(sorted(g.keys()));print(json.dumps(g.get('tvNetworks'),ensure_ascii=False)[:800])"
+          for id in $(cat ids | tr ' ' '\n' | head -3); do
+            curl -s -A "$UA" "https://webws.365scores.com/web/game/?$B&gameId=$id" > g.json
+            python3 -c "
+          import json;g=json.load(open('g.json'))['game']
+          print(g['homeCompetitor']['name'],'-',g['awayCompetitor']['name'])
+          for k in g:
+            if 'tv' in k.lower() or 'broad' in k.lower(): print(k, json.dumps(g[k],ensure_ascii=False)[:900])
+          "
+          done
+          curl -s -I -A "$UA" -H "Origin: null" "https://webws.365scores.com/web/games/allscores/?$B&sports=1" | grep -i access-control
+          curl -s -I -A "$UA" -H "Origin: null" "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=ar&q=Hi" | grep -i "access-control\|HTTP/"
