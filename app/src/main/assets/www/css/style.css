@@ -699,3 +699,8 @@ svg.flg{display:inline-block;width:1.25em;height:.84em;vertical-align:-.08em;bor
 .mt-src{display:flex;gap:26px;align-items:center}.mt-upd b{color:#9fb0d4;font-weight:700}
 #mtAlert .ma-l{display:flex;align-items:center;justify-content:center;margin-top:10px}
 .mt-up.mt-tmr{color:#c4b5fd}.mt-meta .mt-up{white-space:nowrap}
+/* matches: "last update" pill at the far right of the tab row (the tabs stay centred in the space left of it) */
+.mt-tabs{box-sizing:border-box;padding-right:250px}
+#matches .mt-upd{position:absolute;right:30px;top:140px;height:62px;line-height:62px;padding:0 24px;border-radius:31px;background:rgba(255,255,255,.05);
+  border:2px solid rgba(255,255,255,.06);font-size:21px;font-weight:600;color:#9fb0d4;white-space:nowrap;pointer-events:none}
+#matches .mt-upd b{color:#e6ecff;font-weight:700;margin-right:6px}

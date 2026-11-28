@@ -580,7 +580,8 @@ function draw() {
     h += '<div class="cat mt-cat' + (i === S.lg ? ' act' : '') + (S.area === 'lg' && i === S.lg ? ' focus' : '') + '" data-l="' + i + '"><span class="fl">' + l.f + '</span><span class="nm" dir="auto">' + esc(t(l.n)) + '</span><b>' + (S.ev.length ? c.all : '') + '</b></div>';
   });
   $('mtLg').innerHTML = h;
-  $('mtSrc').innerHTML = '<span>' + esc(t('mSrc')) + '</span>' + (S.ts ? '<span class="mt-upd">' + esc(t('mUpdAt')) + ' <b dir="ltr">' + O.fmtHM(S.ts) + '</b></span>' : '');
+  var up = $('mtUpd');   /* "last update" in the tab row, far right */
+  up.innerHTML = S.ts ? esc(t('mUpdAt')) + ' <b dir="ltr">' + O.fmtHM(S.ts) + '</b>' : ''; up.classList.toggle('hidden', !S.ts);
   var cc = counts(LEAGUES[S.lg].id), lab = { live: '🔴 ' + t('mLiveNow'), fin: '✅ ' + t('mEndedTab'), up: '🕐 ' + t('mUpcoming') };
   $('mtTabs').innerHTML = TABS.map(function (k, i) {
     return '<div class="mt-tab' + (i === S.tab ? ' on' : '') + (S.area === 'tabs' && i === S.tab ? ' focus' : '') + '" data-t="' + i + '">' + esc(lab[k]) + '<i>' + cc[k] + '</i></div>';
@@ -611,7 +612,7 @@ function build() {
     '<div class="hbtn" data-go="home" style="left:1790px;margin-left:var(--X,0px)">' + O.ic.home + '</div>' +
     '<div class="pane lv-cats"></div><div class="lv-list mt-lgs" id="mtLg"></div>' +
     '<div class="mt-tabs" id="mtTabs" dir="ltr"></div><div class="mt-list" id="mtList" dir="rtl"></div>' +
-    '<div class="mt-src" id="mtSrc" dir="rtl"></div><div id="mtDet" class="hidden"></div>';
+    '<div class="mt-upd hidden" id="mtUpd" dir="rtl"></div><div id="mtDet" class="hidden"></div>';
   root.addEventListener('click', function (e) {
     var g = e.target.closest('[data-go]'); if (g) { O.app.go(g.getAttribute('data-go')); return; }
     var db = e.target.closest('.md-b'); if (db) { DET.b = +db.getAttribute('data-b'); detAct(DET.b); return; }
