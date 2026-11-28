@@ -1,0 +1,48 @@
+name: probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          D=$(TZ=Europe/Berlin date +%Y%m%d); D2=$(TZ=Europe/Berlin date +%d/%m/%Y)
+          echo "== ESPN tur.1 headers"; curl -s -D - -o espn.json "https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/scoreboard?dates=$D&lang=ar&region=sa" | grep -i "cache-control\|age:\|expires"
+          python3 -c "
+          import json;d=json.load(open('espn.json'))
+          for e in d.get('events',[]):
+            c=e['competitions'][0];st=e['status']['type']
+            t={x['homeAway']:x for x in c['competitors']}
+            print('ESPN',e['date'],t['home']['team']['shortDisplayName'],t['home'].get('score'),'-',t['away'].get('score'),t['away']['team']['shortDisplayName'],'|',st.get('state'),st.get('shortDetail'))"
+          Q="appTypeId=5&langId=1&userCountryId=131&timezoneName=Europe%2FBerlin"
+          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/allscores/?$Q&sports=1&startDate=$D2&endDate=$D2&showOdds=false" > all.json
+          python3 - <<'PY'
+          import json,collections
+          d=json.load(open('all.json'));g=d['games']
+          for x in g:
+            if x['competitionId']==78: print('365',x['startTime'],x['homeCompetitor']['name'],x['homeCompetitor'].get('score'),'-',x['awayCompetitor'].get('score'),x['awayCompetitor']['name'],'| grp',x.get('statusGroup'),x.get('statusText'),'|',x.get('gameTimeDisplay'),x.get('gameTime'),'id',x['id'])
+          c=collections.Counter((x.get('statusGroup'),x.get('statusText'),x.get('shortStatusText')) for x in g)
+          print('STATUS',c.most_common(20))
+          print('COUNTRIES',[(y['id'],y['name']) for y in d.get('countries',[]) if y['name'] in ('Turkey','Germany','Saudi Arabia','Qatar','UAE','United Arab Emirates','Egypt','Syria','Iraq','England','Spain','Italy','France','International','World','Europe','Middle East','MENA')])
+          live=[x for x in g if x.get('statusGroup')==3][:1]
+          if live: print('LIVEKEYS',json.dumps({k:live[0][k] for k in live[0] if k not in ('homeCompetitor','awayCompetitor')},ensure_ascii=False)[:900])
+          open('tur','w').write(' '.join(str(x['id']) for x in g if x['competitionId']==78))
+          PY
+          for id in $(cat tur | tr ' ' '\n' | head -2); do
+            for c in 12 131; do
+              curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/game/?appTypeId=5&langId=27&userCountryId=$c&timezoneName=Europe%2FBerlin&gameId=$id" > g.json
+              python3 -c "
+          import json;d=json.load(open('g.json'));g=d['game']
+          print('DET',$id,'country',$c,'size',len(open('g.json').read()),'tv',json.dumps(g.get('tvNetworks'),ensure_ascii=False)[:400])
+          ev=g.get('events') or []
+          print(' events',len(ev),json.dumps(ev[:2],ensure_ascii=False)[:500])
+          print(' members',json.dumps((g.get('members') or [])[:2],ensure_ascii=False)[:300])"
+            done
+          done
+          for p in "web/games/allscores/?$Q&sports=1&startDate=$D2&endDate=$D2&showOdds=false&competitions=78,7" "web/games/allscores/?$Q&sports=1&onlyLiveGames=true" "web/games/current/?$Q&competitions=78,7" "web/games/allscores/?$Q&sports=1&startDate=$D2&endDate=$D2&withTVNetworks=true&competitions=7"; do
+            curl -s -A "Mozilla/5.0" "https://webws.365scores.com/$p" > x.json
+            python3 -c "
+          import json;s=open('x.json').read()
+          try: d=json.loads(s); g=d.get('games',[]); print('EP','$p'[:60],'size',len(s),'games',len(g),'comps',sorted(set(x['competitionId'] for x in g))[:12],'tvkey',any('tvNetworks' in x for x in g))
+          except Exception as e: print('EP','$p'[:60],'ERR',s[:100])"
+          done
+          echo "== beIN TR"; curl -s -o b.html -w "%{http_code} %{size_download}\n" -A "Mozilla/5.0" "https://www.beinsports.com.tr/yayin-akisi"; head -c 300 b.html | tr '\n' ' '; echo
