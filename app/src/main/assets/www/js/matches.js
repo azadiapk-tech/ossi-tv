@@ -15,7 +15,7 @@ var LEAGUES = [
   { id: 'tur.1', n: 'lgTur', f: '🇹🇷' },
   { id: 'nat', n: 'lgNat', f: '🌍', src: ['fifa.world', 'fifa.worldq.uefa', 'fifa.worldq.afc', 'fifa.worldq.caf', 'uefa.nations', 'uefa.euro', 'fifa.friendly', 'caf.nations', 'afc.asian.cup'] }
 ];
-var TABS = ['live', 'fin', 'up'];
+var TABS = ['live', 'up', 'fin'];   /* on screen from left to right */
 var S = { lg: 0, tab: 0, area: 'lg', li: 0, ev: [], loading: false, err: false, tok: 0, ts: 0 };
 var root = null, built = false, shown = false, timer = 0;
 var MA = O.matches = {};
@@ -40,7 +40,10 @@ function parse(code, d) {
       goals.push({ side: g.team && String(g.team.id) === String(hid) ? 'h' : 'a', min: (g.clock && g.clock.displayValue) || '',
         name: who.shortName || who.displayName || '', og: /own/i.test(tp), pen: /pen/i.test(tp) });
     });
-    out.push({ id: code + ':' + e.id, eid: e.id, code: code, lg: leagueOf(code).id, t: Date.parse(e.date) || 0,
+    var tv = [];
+    (c.geoBroadcasts || []).forEach(function (g) { var n = g.media && (g.media.shortName || g.media.name); if (n && tv.indexOf(n) < 0) tv.push(n); });
+    (c.broadcasts || []).forEach(function (b) { (b.names || []).forEach(function (n) { if (n && tv.indexOf(n) < 0) tv.push(n); }); });
+    out.push({ tv: tv.slice(0, 4), id: code + ':' + e.id, eid: e.id, code: code, lg: leagueOf(code).id, t: Date.parse(e.date) || 0,
       state: ty.state === 'in' ? 'live' : ty.state === 'post' ? 'fin' : 'up',
       clock: ty.shortDetail || st.displayClock || '', h: team(h), a: team(a), goals: goals,
       venue: (c.venue && (c.venue.fullName || (c.venue.address && c.venue.address.city))) || '' });
@@ -166,7 +169,8 @@ function drawDet() {
     '<div class="md-teams"><div class="md-t">' + logo(e.h) + '<b dir="auto">' + esc(e.h.n) + '</b><div class="md-g">' + goals('h') + '</div></div>' +
     '<div class="md-mid">' + mid + '</div>' +
     '<div class="md-t">' + logo(e.a) + '<b dir="auto">' + esc(e.a.n) + '</b><div class="md-g">' + goals('a') + '</div></div></div>' +
-    '<div class="md-info">🕐 ' + O.fmtHM(e.t) + (e.venue ? '   •   🏟 ' + esc(e.venue) : '') + '</div><div class="md-btns">';
+    '<div class="md-info">🕐 ' + O.fmtHM(e.t) + (e.venue ? '   •   🏟 ' + esc(e.venue) : '') + '</div>' +
+    (e.tv.length ? '<div class="md-tv">📺 ' + esc(t('mOnTv')) + ': <b>' + esc(e.tv.join('  •  ')) + '</b></div>' : '') + '<div class="md-btns">';
   detBtns().forEach(function (x, i) { h += '<b class="md-b' + (i === DET.b ? ' focus' : '') + '" data-b="' + i + '">' + esc(x.l) + '</b>'; });
   $('mtDet').innerHTML = h + '</div></div>';
 }
@@ -193,7 +197,7 @@ function row(e, i) {
   return '<div class="mt-row' + (S.area === 'list' && i === S.li ? ' focus' : '') + '" data-i="' + i + '">' +
     '<div class="mt-t mt-h"><span class="mt-n" dir="auto">' + esc(e.h.n) + '</span>' + logo(e.h) + '</div>' + mid +
     '<div class="mt-t mt-a">' + logo(e.a) + '<span class="mt-n" dir="auto">' + esc(e.a.n) + '</span></div>' +
-    '<div class="mt-meta">' + st + (alOn(e) ? '<span class="mt-bell">🔔</span>' : '') + '</div></div>';
+    '<div class="mt-meta">' + st + (e.tv.length ? '<span class="mt-ch">📺 ' + esc(e.tv.join(' • ')) + '</span>' : '') + (alOn(e) ? '<span class="mt-bell">🔔</span>' : '') + '</div></div>';
 }
 function draw() {
   if (!built) return;
@@ -232,7 +236,7 @@ function build() {
   root.innerHTML = '<div class="hdr"></div>' + O.brandBack(t('matches')) +
     '<div class="hbtn" data-go="home" style="left:1790px;margin-left:var(--X,0px)">' + O.ic.home + '</div>' +
     '<div class="pane lv-cats"></div><div class="lv-list mt-lgs" id="mtLg"></div>' +
-    '<div class="mt-tabs" id="mtTabs" dir="rtl"></div><div class="mt-list" id="mtList" dir="rtl"></div>' +
+    '<div class="mt-tabs" id="mtTabs" dir="ltr"></div><div class="mt-list" id="mtList" dir="rtl"></div>' +
     '<div class="mt-src">' + esc(t('mSrc')) + '</div><div id="mtDet" class="hidden"></div>';
   root.addEventListener('click', function (e) {
     var g = e.target.closest('[data-go]'); if (g) { O.app.go(g.getAttribute('data-go')); return; }
@@ -265,13 +269,13 @@ MA.onKey = function (e, k) {
   if (k === K.BACK || k === K.ESC) { O.app.go('home'); e.preventDefault(); return true; }
   if (S.area === 'lg') {
     if (k === K.UP) S.lg = Math.max(0, S.lg - 1); else if (k === K.DOWN) S.lg = Math.min(LEAGUES.length - 1, S.lg + 1);
-    else if (k === K.RIGHT) { S.area = 'tabs'; S.tab = TABS.length - 1; S.li = 0; }   /* → the left-most tab (upcoming) */
+    else if (k === K.RIGHT) { S.area = 'tabs'; }   /* → the tabs (left-most: live) */
     else if (k === K.ENTER) S.area = v.length ? 'list' : 'tabs';
     else used = false;
     S.li = k === K.UP || k === K.DOWN ? 0 : S.li;
   } else if (S.area === 'tabs') {
-    if (k === K.RIGHT) S.tab = Math.max(0, S.tab - 1);
-    else if (k === K.LEFT) { if (S.tab < TABS.length - 1) S.tab++; else S.area = 'lg'; }
+    if (k === K.RIGHT) S.tab = Math.min(TABS.length - 1, S.tab + 1);
+    else if (k === K.LEFT) { if (S.tab > 0) S.tab--; else S.area = 'lg'; }
     else if (k === K.DOWN || k === K.ENTER) { if (v.length) S.area = 'list'; }
     else used = false;
     if (k === K.LEFT || k === K.RIGHT) S.li = 0;

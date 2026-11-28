@@ -149,6 +149,7 @@ var T = {
   mAlertStart: ['تنبيه بالنتيجة', 'Score alerts', 'Tor-Hinweise'], mAlertStop: ['إيقاف التنبيه', 'Stop alerts', 'Hinweise aus'],
   mAlertOn: ['سيظهر تنبيه بالنتيجة أثناء مشاهدة القنوات', 'Score alerts on (while watching TV)', 'Tor-Hinweise an (beim Fernsehen)'], mAlertOff: ['تم إيقاف التنبيه', 'Alerts off', 'Hinweise aus'],
   mGoal: ['هدف!', 'Goal!', 'Tor!'], mKick: ['بدأت المباراة', 'Kick-off', 'Anpfiff'],
+  mOnTv: ['القنوات الناقلة', 'On TV', 'Im TV'],
   mMoveOne: ['نقل', 'Move', 'Verschieben'],
   mMoveMany: ['تحديد عدة عناصر للنقل', 'Select several to move', 'Mehrere zum Verschieben wählen'],
   hMenu: ['خيارات', 'Options', 'Optionen'],
