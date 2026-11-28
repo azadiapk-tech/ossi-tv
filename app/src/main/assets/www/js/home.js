@@ -7,6 +7,7 @@ var TILES = [
   { go: 'live', l: 'live', s: 'liveSub', i: svg('<rect x="6" y="18" width="52" height="38" rx="7" fill="none" stroke="#4f8cff" stroke-width="5"/><path d="M20 6l12 12 12-12" stroke="#4f8cff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 28v18l16-9z" fill="#4f8cff"/>') },
   { go: 'movies', l: 'movies', s: 'moviesSub', i: svg('<rect x="6" y="26" width="52" height="30" rx="4" fill="#ffab40"/><path d="M6 12l10 12M22 12l10 12M38 12l10 12M52 14l6 10" stroke="#ffab40" stroke-width="6" stroke-linecap="round"/><path d="M32 33l3 6 6 1-5 4 1 7-5-3-5 3 1-7-5-4 6-1z" fill="#fff3d6"/>') },
   { go: 'series', l: 'series', s: 'seriesSub', i: svg('<rect x="14" y="6" width="44" height="36" rx="5" fill="#e040fb"/><path d="M30 14v20l16-10z" fill="#fff"/><path d="M6 16v34a5 5 0 005 5h33" stroke="#e040fb" stroke-width="5" fill="none" stroke-linecap="round"/>') },
+  { go: 'radio', l: 'radio', s: 'radioSub', i: svg('<rect x="6" y="22" width="52" height="36" rx="7" fill="none" stroke="#22d3ee" stroke-width="5"/><path d="M14 22L46 8" stroke="#22d3ee" stroke-width="5" stroke-linecap="round"/><circle cx="22" cy="40" r="9" fill="none" stroke="#d946ef" stroke-width="5"/><path d="M38 34h12M38 42h12M38 50h8" stroke="#22d3ee" stroke-width="4" stroke-linecap="round"/>') },
   { go: 'settings', l: 'settings', s: 'settingsSub', i: svg('<circle cx="32" cy="32" r="14" fill="none" stroke="#5ef0a8" stroke-width="9"/><circle cx="32" cy="32" r="26" fill="none" stroke="#5ef0a8" stroke-width="9" stroke-dasharray="7.2 7.2"/>') }
 ];
 var H = O.home = {}, root, built = false, idx = 0, clockT = 0, area = 'tiles', ci = 0, cont = [];
@@ -17,7 +18,7 @@ function build() {
   if (O.matches && O.matches.enabled() && !TILES.some(function (x) { return x.go === 'matches'; }))
     TILES.splice(3, 0, { go: 'matches', l: 'matches', s: 'matchesSub', i: svg('<circle cx="32" cy="30" r="20" fill="#fff"/><path d="M32 18l7 5-3 8h-8l-3-8z" fill="#111"/><path d="M32 18v-8M39 23l8-3M36 31l5 7M28 31l-5 7M25 23l-8-3" stroke="#111" stroke-width="2.5"/><ellipse cx="32" cy="50" rx="26" ry="7" fill="none" stroke="#22c55e" stroke-width="5"/>') });
   var h = O.brand + '<div class="hinfo"><div class="subbadge hidden" id="hSub"></div><div class="plbadge" dir="auto"><span>' + esc(t('playlist')) + ':</span><b id="hPl"></b></div></div>' +
-    '<div class="clock"><b id="hTime"></b><span id="hDate"></span></div><div class="tiles' + (TILES.length > 4 ? ' five' : '') + '">';
+    '<div class="clock"><b id="hTime"></b><span id="hDate"></span></div><div class="tiles' + (TILES.length > 5 ? ' six' : TILES.length > 4 ? ' five' : '') + '">';
   TILES.forEach(function (x, i) {
     h += '<div class="tile" data-i="' + i + '">' + x.i + '<h3 dir="auto">' + esc(t(x.l)) + '</h3><p dir="auto">' + esc(t(x.s)) + '</p></div>';
   });

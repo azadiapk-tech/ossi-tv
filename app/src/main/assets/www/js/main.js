@@ -2,7 +2,7 @@
 (function () {
 'use strict';
 var O = window.O, $ = O.$, K = O.K, t = O.t, D = O.data, Pl = O.player;
-var scr, parent = { live: 'home', movies: 'home', series: 'home', settings: 'home', detail: 'series', multi: 'settings' };
+var scr, parent = { live: 'home', movies: 'home', series: 'home', settings: 'home', radio: 'home', detail: 'series', multi: 'settings' };
 var cur = null;
 
 O.app = {
@@ -76,6 +76,7 @@ function onKey(e) {
     }
   }
 
+  if (k === K.RED && cur === 'radio') { e.preventDefault(); if (!redHeld) { redHeld = true; O.radio.onKey(e, k); } return; }
   if (k === K.RED) {
     if (cur !== 'live' || O.pui.active || O.live.overlayOpen()) return;
     e.preventDefault();
@@ -131,7 +132,7 @@ function hideSplash() {
 }
 
 function boot() {
-  scr = { login: O.login, home: O.home, live: O.live, movies: O.movies, series: O.series, detail: O.detail, matches: O.matches, settings: O.settings, multi: O.multi };
+  scr = { login: O.login, home: O.home, live: O.live, movies: O.movies, series: O.series, detail: O.detail, matches: O.matches, radio: O.radio, settings: O.settings, multi: O.multi };
   O.plInit(); fit(); registerKeys();
   document.documentElement.lang = O.lang();
   /* a fresh start always loads fresh data; the account info is retried if the first try fails */

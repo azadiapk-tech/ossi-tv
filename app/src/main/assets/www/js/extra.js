@@ -301,7 +301,7 @@ O.searchKb = function (inp) {
 var CK = O.clock = {}, ckEl = null;
 CK.on = function () { return !!O.cfg.get('clock', false); };
 CK.toggle = function () { O.cfg.set('clock', !CK.on()); CK.tick(); };
-var ROOTS = { live: 'live', movies: 'vodm', series: 'vods', detail: 'detail', matches: 'matches', settings: 'settings' };
+var ROOTS = { live: 'live', radio: 'radio', movies: 'vodm', series: 'vods', detail: 'detail', matches: 'matches', settings: 'settings' };
 CK.tick = function () {
   if (!ckEl) { ckEl = document.createElement('div'); ckEl.id = 'clock'; ckEl.className = 'hidden'; var st = $('stage'); if (!st) return; st.appendChild(ckEl); }
   var cur = O.app && O.app.cur ? O.app.cur() : '', inPl = !!(O.pui && O.pui.active);
