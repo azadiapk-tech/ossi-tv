@@ -32,7 +32,7 @@ function parse(code, d) {
     var h = null, a = null;
     (c.competitors || []).forEach(function (x) { if (x.homeAway === 'home') h = x; else a = x; });
     if (!h || !a) return;
-    function team(x) { var tm = x.team || {}; return { n: tm.shortDisplayName || tm.displayName || tm.name || '?', logo: tm.logo || (tm.logos && tm.logos[0] && tm.logos[0].href) || '', s: x.score != null ? String(x.score) : '' }; }
+    function team(x) { var tm = x.team || {}; return { ab: tm.abbreviation || '', full: tm.displayName || '', n: tm.shortDisplayName || tm.displayName || tm.name || '?', logo: tm.logo || (tm.logos && tm.logos[0] && tm.logos[0].href) || '', s: x.score != null ? String(x.score) : '' }; }
     var hid = h.team && h.team.id, goals = [];
     (c.details || []).forEach(function (g) {
       if (!g.scoringPlay) return;
@@ -66,10 +66,88 @@ function load(quiet) {
     S.loading = false; S.ts = Date.now();
     if (!got.length && fails === codes.length) { S.err = true; draw(); return; }
     got.sort(function (x, y) { return x.t - y.t; });
-    var keep = S.ev.length; S.ev = got;
-    draw(); schedule();
+    S.ev = got; tvApply();
+    draw(); schedule(); tv365();
   }
 }
+/* ---------- which channels show the match: from 365Scores (Arabic channel names) ----------
+   The day's list gives the games; the channels are only in each game's own page, so those are
+   fetched one by one (and kept: they do not change). */
+var T365 = { ts: 0, games: [], busy: false }, TVC = {}, MAP = {}, PEND = {}, tvDrawT = 0;
+var Q365 = 'appTypeId=5&langId=27&userCountryId=131&timezoneName=';
+var CMP = { 'esp.1': 11, 'eng.1': 7, 'ger.1': 25, 'ita.1': 17, 'fra.1': 35 };
+function tz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin'; } catch (e) { return 'Europe/Berlin'; } }
+function norm(n) {
+  return String(n || '').toLowerCase().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/(^|\s)ال/g, '$1')
+    .replace(/\b(fc|cf|ac|sc|afc|ssc|as|club|de|ال)\b/g, '').replace(/[^\w\u0600-\u06ff]/g, '');
+}
+function sim(a, b) {
+  a = norm(a); b = norm(b); if (!a || !b) return 0;
+  if (a === b || a.indexOf(b) > -1 || b.indexOf(a) > -1) return 1;
+  var g = {}, n = 0, hit = 0, i;
+  for (i = 0; i < a.length - 1; i++) { g[a.substr(i, 2)] = (g[a.substr(i, 2)] || 0) + 1; n++; }
+  for (i = 0; i < b.length - 1; i++) { var k = b.substr(i, 2); if (g[k]) { g[k]--; hit++; } }
+  return n ? 2 * hit / (n + b.length - 1) : 0;
+}
+function tside(tm, c) {
+  var s = Math.max(sim(tm.n, c.name), sim(tm.full, c.name), sim(tm.n, c.shortName || ''));
+  if (tm.ab && c.symbolicName && tm.ab.toUpperCase() === String(c.symbolicName).toUpperCase()) s += 0.6;
+  return s;
+}
+function match365(e) {
+  var best = null, bs = 0, cid = CMP[e.code];
+  T365.games.forEach(function (g) {
+    if (!g.homeCompetitor || !g.awayCompetitor) return;
+    var gt = Date.parse(g.startTime) || 0; if (Math.abs(gt - e.t) > 20 * 60000) return;
+    var sc = tside(e.h, g.homeCompetitor) + tside(e.a, g.awayCompetitor);
+    if (cid && g.competitionId === cid) sc += 0.5;
+    if (sc > bs) { bs = sc; best = g; }
+  });
+  return bs >= 0.9 ? best : null;
+}
+function tvApply() {
+  S.ev.forEach(function (e) { var g = MAP[e.id]; if (g && TVC[g] && TVC[g].length) e.tv = TVC[g].slice(0, 4); });
+}
+function tvRedraw() {
+  clearTimeout(tvDrawT);
+  tvDrawT = setTimeout(function () { tvApply(); if (shown) { draw(); if (DET) drawDet(); } }, 300);
+}
+function tv365() {
+  if (T365.busy) return;
+  var now = new Date();
+  if (T365.games.length && Date.now() - T365.ts < 30 * 60000) { tvDetails(); return; }
+  T365.busy = true;
+  var d = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear();
+  O.httpJSON('https://webws.365scores.com/web/games/allscores/?' + Q365 + encodeURIComponent(tz()) +
+    '&sports=1&startDate=' + d + '&endDate=' + d + '&showOdds=false', function (r) {
+    T365.busy = false; T365.ts = Date.now(); T365.games = (r && r.games) || []; tvDetails();
+  }, function () { T365.busy = false; });
+}
+function tvDetails() {
+  var todo = [];
+  S.ev.forEach(function (e) {
+    if (MAP[e.id] == null) { var g = match365(e); MAP[e.id] = g ? g.id : 0; if (g && !g.hasTVNetworks) TVC[g.id] = TVC[g.id] || []; }
+    var id = MAP[e.id];
+    if (id && !TVC[id] && !PEND[id] && todo.indexOf(id) < 0) todo.push(id);
+  });
+  tvApply();
+  var run = 0;
+  (function next() {
+    while (run < 3 && todo.length) {
+      var id = todo.shift(); run++;
+      PEND[id] = 1;
+      (function (id) {
+        O.httpJSON('https://webws.365scores.com/web/game/?' + Q365 + encodeURIComponent(tz()) + '&gameId=' + id, function (r) {
+          var n = [];
+          (((r && r.game) || {}).tvNetworks || []).forEach(function (x) { if (x && x.name && n.indexOf(x.name) < 0) n.push(x.name); });
+          delete PEND[id]; TVC[id] = n; run--; if (n.length) tvRedraw(); next();
+        }, function () { delete PEND[id]; run--; next(); });
+      })(id);
+    }
+  })();
+}
+MA._tv = { sim: sim, match: match365, T: T365, MAP: MAP, TVC: TVC };
+
 function schedule() {
   clearTimeout(timer);
   if (!shown) return;
@@ -290,6 +368,6 @@ MA.onKey = function (e, k) {
   return used;
 };
 MA.relang = function () { built = false; };
-/* only on phones for now (testing): not on TVs and not in the Windows app */
-MA.enabled = function () { return !!(window.OssiNative && O.isTouch()); };
+/* phone, Fire TV and the Windows app */
+MA.enabled = function () { return true; };
 })();
