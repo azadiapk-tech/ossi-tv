@@ -6,13 +6,14 @@ jobs:
     steps:
       - run: |
           E1=$(TZ=Europe/Berlin date +%Y%m%d); E2=$(TZ=Europe/Berlin date -d '+1 day' +%Y%m%d); E12=$(TZ=Europe/Berlin date -d '+12 day' +%Y%m%d)
-          for spec in "eng.1 $E1-$E2" "tur.1 $E1-$E2" "uefa.champions $E1-$E12" "uefa.champions $E1-$E2"; do
-            set -- $spec
-            curl -s --compressed "https://site.api.espn.com/apis/site/v2/sports/soccer/$1/scoreboard?dates=$2&lang=ar&region=sa" > e.json
-            python3 - "$1" "$2" <<'PY'
+          B="https://site.api.espn.com/apis/site/v2/sports/soccer"
+          for u in "eng.1/scoreboard?dates=$E1&lang=ar&region=sa" "eng.1/scoreboard?dates=$E2&lang=ar&region=sa" "eng.1/scoreboard?dates=$E1-$E2" "eng.1/scoreboard?dates=$E1-$E2&lang=ar&region=sa&limit=100" "uefa.champions/scoreboard?dates=$E1-$E12" "uefa.champions/scoreboard" "uefa.champions/scoreboard?dates=20261208&lang=ar&region=sa" "tur.1/scoreboard?dates=$E2&lang=ar&region=sa"; do
+            curl -s --compressed -o e.json -w "%{http_code} " "$B/$u"
+            python3 - "$u" <<'PY'
           import json,sys,collections
-          d=json.load(open('e.json'));ev=d.get('events',[])
-          print('ESPN',sys.argv[1],sys.argv[2],len(ev),dict(collections.Counter(e['date'][:10] for e in ev)))
-          for e in ev[:4]: print('   ',e['date'],e['name'][:50],e['status']['type']['state'])
+          try:
+            d=json.load(open('e.json'));ev=d.get('events',[])
+            print('ESPN',sys.argv[1][:70],len(ev),dict(collections.Counter(e['date'][:10] for e in ev)),[e['name'][:30] for e in ev[:2]])
+          except Exception as x: print('ESPN',sys.argv[1][:70],'ERR',open('e.json','rb').read()[:120])
           PY
           done
