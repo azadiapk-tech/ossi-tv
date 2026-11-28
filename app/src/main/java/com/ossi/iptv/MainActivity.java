@@ -463,7 +463,7 @@ public class MainActivity extends Activity {
            Result: window.__ossiFetch(id, status, base64Body) */
         @JavascriptInterface public void fetch(final String url, final String id) {
             new Thread(new Runnable() { @Override public void run() {
-                int code = 0; String body = "";
+                int code = 0; String body = "", ctype = "";
                 java.net.HttpURLConnection c = null;
                 try {
                     c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
@@ -472,6 +472,7 @@ public class MainActivity extends Activity {
                     c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36");
                     c.setRequestProperty("Accept", "application/json,*/*");
                     code = c.getResponseCode();
+                    ctype = String.valueOf(c.getContentType() == null ? "" : c.getContentType()).replaceAll("[^A-Za-z0-9/;=_ .+-]", "");
                     java.io.InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
                     if (in != null) {
                         java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
@@ -483,7 +484,7 @@ public class MainActivity extends Activity {
                 } catch (Exception e) { code = 0; }
                 finally { if (c != null) c.disconnect(); }
                 String sid = id.replaceAll("[^A-Za-z0-9_]", "");
-                js("window.__ossiFetch&&__ossiFetch('" + sid + "'," + code + ",'" + body + "')");
+                js("window.__ossiFetch&&__ossiFetch('" + sid + "'," + code + ",'" + body + "','" + ctype + "')");
             } }).start();
         }
         @JavascriptInterface public void downloadUpdate(final String url) { MainActivity.this.downloadUpdate(url); }

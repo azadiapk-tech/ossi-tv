@@ -159,14 +159,29 @@ O.getJSON = function (url, ok, fail, tries, ms) {
    (no WebView/CORS limits); elsewhere a normal request. ok(text) / ok(json) */
 O.httpGet = (function () {
   var seq = 0, wait = {};
-  window.__ossiFetch = function (id, status, b64) {
+  /* bytes -> text in the page's own character set (some Turkish sites are not UTF-8) */
+  function decode(u, ctype) {
+    var cs = (/charset=["']?([\w-]+)/i.exec(ctype || '') || [])[1];
+    if (!cs) {
+      var head = '', n = Math.min(u.length, 4096);
+      for (var i = 0; i < n; i++) head += String.fromCharCode(u[i]);
+      cs = (/<meta[^>]+charset=["']?([\w-]+)/i.exec(head) || [])[1];
+    }
+    cs = String(cs || 'utf-8').toLowerCase();
+    if (window.TextDecoder) {
+      try { return new TextDecoder(cs).decode(u); } catch (e) { return new TextDecoder('utf-8').decode(u); }
+    }
+    var s = ''; for (var j = 0; j < u.length; j++) s += String.fromCharCode(u[j]);
+    try { return decodeURIComponent(escape(s)); } catch (e) { return s; }
+  }
+  window.__ossiFetch = function (id, status, b64, ctype) {
     var w = wait[id]; if (!w) return; delete wait[id]; clearTimeout(w.t);
     if (!(status >= 200 && status < 300)) { w.fail('HTTP ' + status); return; }
     var txt = '';
     try {
-      var bin = atob(b64 || '');
-      if (window.TextDecoder) { var u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); txt = new TextDecoder('utf-8').decode(u); }
-      else txt = decodeURIComponent(escape(bin));
+      var bin = atob(b64 || ''), u = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      txt = decode(u, ctype);
     } catch (e) { w.fail('decode'); return; }
     w.ok(txt);
   };
@@ -174,7 +189,15 @@ O.httpGet = (function () {
     var x = new XMLHttpRequest(), fin = false;
     function bad(m) { if (!fin) { fin = true; fail(m); } }
     x.open('GET', url, true); x.timeout = 30000;
-    x.onload = function () { if (fin) return; if (x.status >= 200 && x.status < 300) { fin = true; ok(x.responseText); } else bad('HTTP ' + x.status); };
+    try { x.responseType = 'arraybuffer'; } catch (e) {}
+    x.onload = function () {
+      if (fin) return;
+      if (!(x.status >= 200 && x.status < 300)) { bad('HTTP ' + x.status); return; }
+      var txt;
+      try { txt = x.response instanceof ArrayBuffer ? decode(new Uint8Array(x.response), x.getResponseHeader('content-type')) : x.responseText; }
+      catch (e) { bad('decode'); return; }
+      fin = true; ok(txt);
+    };
     x.onerror = function () { bad('network'); }; x.ontimeout = function () { bad('timeout'); };
     try { x.send(); } catch (e) { bad('network'); }
   }

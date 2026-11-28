@@ -144,7 +144,7 @@ var T = {
   mLinked: ['تم ربط القناة:', 'Channel linked:', 'Sender verknüpft:'],
   mFail: ['تعذّر تحميل المباريات، تحقق من الإنترنت', 'Could not load the matches', 'Spiele konnten nicht geladen werden'],
   mNone: ['لا توجد مباريات هنا اليوم', 'No matches here today', 'Heute keine Spiele hier'],
-  mSrc: ['المصادر: ESPN  •  365Scores  •  beIN SPORTS', 'Sources: ESPN  •  365Scores  •  beIN SPORTS', 'Quellen: ESPN  •  365Scores  •  beIN SPORTS'],
+  mSrc: ['المصادر: ESPN  •  365Scores  •  beIN SPORTS  •  Sporx', 'Sources: ESPN  •  365Scores  •  beIN SPORTS  •  Sporx', 'Quellen: ESPN  •  365Scores  •  beIN SPORTS  •  Sporx'],
   mUpdAt: ['آخر تحديث', 'Updated', 'Aktualisiert'],
   mPostp: ['مؤجلة', 'Postponed', 'Verschoben'],
   mSusp: ['متوقفة', 'Suspended', 'Unterbrochen'],
