@@ -5,31 +5,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          D1=$(TZ=Europe/Berlin date +%d/%m/%Y); D2=$(TZ=Europe/Berlin date -d '+1 day' +%d/%m/%Y)
-          E1=$(TZ=Europe/Berlin date +%Y%m%d); E2=$(TZ=Europe/Berlin date -d '+1 day' +%Y%m%d); E7=$(TZ=Europe/Berlin date -d '+7 day' +%Y%m%d)
-          Q="appTypeId=5&langId=1&userCountryId=131&timezoneName=Europe%2FBerlin"
-          show() { python3 - "$1" <<'PY'
+          E1=$(TZ=Europe/Berlin date +%Y%m%d); E2=$(TZ=Europe/Berlin date -d '+1 day' +%Y%m%d); E12=$(TZ=Europe/Berlin date -d '+12 day' +%Y%m%d)
+          for spec in "eng.1 $E1-$E2" "tur.1 $E1-$E2" "uefa.champions $E1-$E12" "uefa.champions $E1-$E2"; do
+            set -- $spec
+            curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/$1/scoreboard?dates=$2&lang=ar&region=sa" > e.json
+            python3 - "$1" "$2" <<'PY'
           import json,sys,collections
-          s=open('x.json').read()
-          try:
-            d=json.loads(s); g=d.get('games',[])
-            days=collections.Counter(x['startTime'][:10] for x in g)
-            print('EP',sys.argv[1],'size',len(s),'games',len(g),'comps',sorted(set(x['competitionId'] for x in g))[:15],'days',dict(days))
-          except Exception as e: print('EP',sys.argv[1],'ERR',s[:120])
+          d=json.load(open('e.json'));ev=d.get('events',[])
+          print('ESPN',sys.argv[1],sys.argv[2],len(ev),dict(collections.Counter(e['date'][:10] for e in ev)))
+          for e in ev[:4]: print('   ',e['date'],e['name'][:50],e['status']['type']['state'])
           PY
-          }
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/?$Q&competitions=7,78&startDate=$D1&endDate=$D2" > x.json; show games_comps_2days
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/?$Q&sports=1&competitions=7,78&startDate=$D1&endDate=$D2" > x.json; show games_sports_comps_2days
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/current/?$Q&competitions=11,7,25,17,35,78,572" > x.json; show current_all
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/fixtures/?$Q&competitions=7" > x.json; show fixtures7
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/fixtures/?$Q&competitions=572" > x.json; show fixtures572
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/allscores/?$Q&sports=1&startDate=$D1&endDate=$D2&showOdds=false" > x.json; show allscores_2days
-          python3 -c "
-          import json;d=json.load(open('x.json'))
-          print('UCL',[(c['id'],c['name'],c.get('countryId')) for c in d.get('competitions',[]) if 'Champions' in c['name'] or 'Europa' in c['name'] or 'Conference' in c['name']])"
-          for c in "eng.1&dates=$E1-$E2" "uefa.champions&dates=$E1-$E7"; do
-            code=${c%%&*}; curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/$code/scoreboard?${c#*&}&lang=ar&region=sa" > e.json
-            python3 -c "
-          import json,collections;d=json.load(open('e.json'));ev=d.get('events',[])
-          print('ESPN','$c',len(ev),dict(collections.Counter(e['date'][:10] for e in ev)), [ (e['date'][5:16], e['name'][:40]) for e in ev[:3]])"
           done
