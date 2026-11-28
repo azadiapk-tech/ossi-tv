@@ -13,8 +13,11 @@ var H = O.home = {}, root, built = false, idx = 0, clockT = 0, area = 'tiles', c
 
 function build() {
   root = $('home');
+  /* matches tile (only where the matches section is switched on) */
+  if (O.matches && O.matches.enabled() && !TILES.some(function (x) { return x.go === 'matches'; }))
+    TILES.splice(3, 0, { go: 'matches', l: 'matches', s: 'matchesSub', i: svg('<circle cx="32" cy="30" r="20" fill="#fff"/><path d="M32 18l7 5-3 8h-8l-3-8z" fill="#111"/><path d="M32 18v-8M39 23l8-3M36 31l5 7M28 31l-5 7M25 23l-8-3" stroke="#111" stroke-width="2.5"/><ellipse cx="32" cy="50" rx="26" ry="7" fill="none" stroke="#22c55e" stroke-width="5"/>') });
   var h = O.brand + '<div class="hinfo"><div class="subbadge hidden" id="hSub"></div><div class="plbadge" dir="auto"><span>' + esc(t('playlist')) + ':</span><b id="hPl"></b></div></div>' +
-    '<div class="clock"><b id="hTime"></b><span id="hDate"></span></div><div class="tiles">';
+    '<div class="clock"><b id="hTime"></b><span id="hDate"></span></div><div class="tiles' + (TILES.length > 4 ? ' five' : '') + '">';
   TILES.forEach(function (x, i) {
     h += '<div class="tile" data-i="' + i + '">' + x.i + '<h3 dir="auto">' + esc(t(x.l)) + '</h3><p dir="auto">' + esc(t(x.s)) + '</p></div>';
   });

@@ -131,7 +131,7 @@ function hideSplash() {
 }
 
 function boot() {
-  scr = { login: O.login, home: O.home, live: O.live, movies: O.movies, series: O.series, detail: O.detail, settings: O.settings, multi: O.multi };
+  scr = { login: O.login, home: O.home, live: O.live, movies: O.movies, series: O.series, detail: O.detail, matches: O.matches, settings: O.settings, multi: O.multi };
   O.plInit(); fit(); registerKeys();
   document.documentElement.lang = O.lang();
   /* a fresh start always loads fresh data; the account info is retried if the first try fails */

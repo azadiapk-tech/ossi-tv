@@ -269,6 +269,10 @@ function enterFull() {
 }
 function exitFull() {
   clearTimeout(zapT);
+  if (S.returnTo) {                       /* opened from another section (matches): go back there */
+    var r = S.returnTo; S.returnTo = null;
+    O.pui.exit(); S.full = false; Pl.stop(); S.playing = null; O.app.go(r); return;
+  }
   O.pui.exit(); S.full = false; root.classList.remove('hidden'); root.classList.remove('overlay'); S.overlay = false;
   if (O.cfg.get('preview', true) && Pl.st !== 'idle') Pl.setRect(PREVR()); else { Pl.stop(); S.playing = null; }
   var i = S.view.indexOf(S.playing);
@@ -577,6 +581,12 @@ Live.gotoNumber = function (n) {
 };
 
 /* ---------- lifecycle ---------- */
+/* play a channel full screen from another section; BACK returns there */
+Live.playFrom = function (ch, back) {
+  O.app.go('live');
+  S.returnTo = back || null;
+  playChannel(ch, true); enterFull();
+};
 Live.show = function (arg) {
   if (!built) build();
   shown = true; S.full = false; S.overlay = false;

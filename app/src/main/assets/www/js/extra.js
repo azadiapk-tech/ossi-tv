@@ -302,14 +302,14 @@ CK.toggle = function () { O.cfg.set('clock', !CK.on()); CK.tick(); };
 CK.tick = function () {
   if (!ckEl) { ckEl = document.createElement('div'); ckEl.id = 'clock'; ckEl.className = 'hidden'; var st = $('stage'); if (!st) return; st.appendChild(ckEl); }
   var cur = O.app && O.app.cur ? O.app.cur() : '', inPl = !!(O.pui && O.pui.active);
-  var show = CK.on() && (inPl || /^(live|movies|series|detail)$/.test(cur));
+  var show = CK.on() && (inPl || /^(live|movies|series|detail|matches)$/.test(cur));
   ckEl.classList.toggle('hidden', !show);
   ckEl.classList.toggle('inpl', inPl);
   if (!show) return;
   var d = new Date(), tx = p2(d.getHours()) + ':' + p2(d.getMinutes()); if (ckEl.textContent !== tx) ckEl.textContent = tx;
   /* in the player: top right corner; in the lists: right next to the home button(s) */
   if (inPl) { ckEl.style.left = ((O.stageW || 1920) - ckEl.offsetWidth - 40) + 'px'; return; }
-  var root = $({ live: 'live', movies: 'vodm', series: 'vods', detail: 'detail' }[cur]), x = 0;
+  var root = $({ live: 'live', movies: 'vodm', series: 'vods', detail: 'detail', matches: 'matches' }[cur]), x = 0;
   if (root) [].forEach.call(root.querySelectorAll('.hbtn'), function (b) { if (b.offsetParent !== null && (!x || b.offsetLeft < x)) x = b.offsetLeft; });
   ckEl.style.left = Math.max(300, (x || 1790) - ckEl.offsetWidth - 24) + 'px';
 };
