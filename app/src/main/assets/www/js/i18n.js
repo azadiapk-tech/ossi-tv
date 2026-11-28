@@ -138,7 +138,7 @@ var T = {
   lgGer: ['الدوري الألماني', 'Bundesliga', 'Bundesliga'], lgIta: ['الدوري الإيطالي', 'Serie A', 'Serie A'],
   lgFra: ['الدوري الفرنسي', 'Ligue 1', 'Ligue 1'], lgTur: ['الدوري التركي', 'Süper Lig', 'Süper Lig'],
   lgNat: ['بطولات المنتخبات', 'National teams', 'Nationalteams'],
-  mLiveNow: ['مباشر الآن', 'Live now', 'Jetzt live'], mEndedTab: ['انتهت', 'Finished', 'Beendet'], mUpcoming: ['قادمة', 'Upcoming', 'Demnächst'],
+  mLiveNow: ['مباشر الآن', 'Live now', 'Jetzt live'], mEndedTab: ['المباريات المنتهية', 'Finished matches', 'Beendete Spiele'], mUpcoming: ['المباريات القادمة', 'Upcoming matches', 'Kommende Spiele'],
   mLive: ['مباشر', 'Live', 'Live'], mEnded: ['انتهت', 'Full time', 'Beendet'], mToday: ['اليوم', 'Today', 'Heute'], mTomorrow: ['غداً', 'Tomorrow', 'Morgen'],
   mLink: ['ربط قناة', 'Link a channel', 'Sender verknüpfen'], mRelink: ['تغيير القناة', 'Change channel', 'Sender ändern'],
   mUnlink: ['إلغاء ربط القناة', 'Remove channel', 'Verknüpfung entfernen'], mWatch: ['مشاهدة', 'Watch', 'Ansehen'],

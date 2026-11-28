@@ -102,16 +102,15 @@ function load(quiet) {
     if (DET && DET.e.state !== 'up') det365(DET.e);
   }
 }
-/* today's games (and any still running), tomorrow's, and – for leagues marked "ahead" that have no game
-   today or tomorrow – their next match days (shown only in that league, not under "all") */
+/* today's games (and any still running), tomorrow's, and – for leagues marked "ahead" (Champions League) –
+   the rest of their coming round: every game of the next week of matches, shown only in that league
+   (not under "all"). When a round is over, the next one appears. */
 var NXT = {};
 function combine(fetch) {
   var k1 = ymd(plusDays(1)), seen = {}, all = [], list = (S.today || []).concat(TMR.day === k1 ? TMR.ev : []);
   LEAGUES.forEach(function (l) {
     if (!l.ahead) return;
-    var has = list.some(function (e) { return e.lg === l.id && (e.state === 'live' || dayOf(e.t) <= 1); });
     var n = NXT[l.id];
-    if (has) return;
     if (n && n.ev) list = list.concat(n.ev.filter(function (e) { return dayOf(e.t) > 1; }));
     if (fetch && (!n || (!n.busy && Date.now() - n.ts > 6 * 3600000))) aheadFetch(l);
   });
@@ -133,7 +132,7 @@ function aheadFetch(l) {
     if (!gs.length) { n.busy = false; n.ts = Date.now(); n.ev = []; return; }
     var first = Date.parse(gs[0].startTime), days = {};
     gs.forEach(function (g) {
-      var tt = Date.parse(g.startTime); if (tt - first > 3 * 864e5) return;
+      var tt = Date.parse(g.startTime); if (tt - first > 6 * 864e5) return;      /* one round = one week */
       days[ymd(new Date(tt))] = new Date(tt); GI[g.id] = g;
     });
     T365.gen++;
@@ -657,7 +656,13 @@ MA.onKey = function (e, k) {
   } else {
     if (k === K.UP) { if (S.li > 0) S.li--; else S.area = 'tabs'; }
     else if (k === K.DOWN) S.li = Math.min(v.length - 1, S.li + 1);
-    else if (k === K.LEFT) S.area = 'lg';
+    /* left / right inside the list: straight to the neighbouring tab (live ◀▶ upcoming ◀▶ finished);
+       left of the first tab: back to the leagues */
+    else if (k === K.RIGHT || k === K.LEFT) {
+      var nt = S.tab + (k === K.RIGHT ? 1 : -1);
+      if (nt < 0) S.area = 'lg';
+      else if (nt < TABS.length) { S.tab = nt; S.li = 0; S.area = view().length ? 'list' : 'tabs'; }
+    }
     else if (k === K.ENTER || k === K.MENU) { if (v[S.li]) openDet(v[S.li]); }
     else used = false;
   }
