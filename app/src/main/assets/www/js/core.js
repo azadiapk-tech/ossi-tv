@@ -155,6 +155,34 @@ O.getJSON = function (url, ok, fail, tries) {
   return ctl;
 };
 
+/* GET JSON from an outside site (translation, match data). On Android the request runs natively
+   (no WebView/CORS limits); elsewhere a normal XHR. */
+O.httpJSON = (function () {
+  var seq = 0, wait = {};
+  window.__ossiFetch = function (id, status, b64) {
+    var w = wait[id]; if (!w) return; delete wait[id]; clearTimeout(w.t);
+    if (!(status >= 200 && status < 300)) { w.fail('HTTP ' + status); return; }
+    var txt = '';
+    try {
+      var bin = atob(b64 || '');
+      if (window.TextDecoder) { var u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); txt = new TextDecoder('utf-8').decode(u); }
+      else txt = decodeURIComponent(escape(bin));
+    } catch (e) { w.fail('decode'); return; }
+    var d; try { d = JSON.parse(txt); } catch (e) { w.fail('no JSON'); return; }
+    w.ok(d);
+  };
+  return function (url, ok, fail) {
+    fail = fail || function () {};
+    var N = window.OssiNative;
+    if (N && N.fetch) {
+      var id = 'f' + (++seq);
+      wait[id] = { ok: ok, fail: fail, t: setTimeout(function () { if (wait[id]) { delete wait[id]; fail('timeout'); } }, 40000) };
+      try { N.fetch(url, id); return; } catch (e) { delete wait[id]; }
+    }
+    O.getJSON(url, ok, fail, 1);
+  };
+})();
+
 /* ---------- data layer ---------- */
 var D = O.data = {};
 var ACT = {
@@ -237,15 +265,28 @@ D.getAllVod = function (type, ok, fail) {
 D.translate = function (text, ok, fail) {
   var tl = O.lang(), key = 'tr.' + tl + '.' + text.length + '.' + text.slice(0, 40);
   var hit = O.store.g(key, null); if (hit) { ok(hit); return; }
-  var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' + tl + '&dt=t&q=' + encodeURIComponent(text.slice(0, 4500));
-  O.getJSON(url, function (d) {
-    var out = '';
-    try { (d[0] || []).forEach(function (seg) { if (seg && seg[0]) out += seg[0]; }); } catch (e) {}
-    if (!out) { fail(); return; }
-    var src = d && d[2];
-    if (src && src === tl) { ok(null); return; }             /* already in this language */
-    O.store.gs(key, out); ok(out);
-  }, fail, 1);
+  var q = encodeURIComponent(text.slice(0, 4000));
+  function done(out, src) {
+    if (!out) return false;
+    if (src && src === tl) { ok(null); return true; }        /* already in this language */
+    O.store.gs(key, out); ok(out); return true;
+  }
+  /* two public Google endpoints: if one refuses (e.g. "too many requests"), the other is tried */
+  function gtx() {
+    O.httpJSON('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' + tl + '&dt=t&q=' + q, function (d) {
+      var out = '';
+      try { (d[0] || []).forEach(function (seg) { if (seg && seg[0]) out += seg[0]; }); } catch (e) {}
+      if (!done(out, d && d[2])) fail();
+    }, fail);
+  }
+  O.httpJSON('https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=' + tl + '&q=' + q, function (d) {
+    var out = '', src = '';
+    try {
+      var r = Array.isArray(d) ? d : (d.sentences ? [d.sentences.map(function (s) { return s.trans || ''; }).join('')] : []);
+      if (Array.isArray(r[0])) { out = String(r[0][0] || ''); src = r[0][1] || ''; } else out = String(r[0] || '');
+    } catch (e) {}
+    if (!done(out, src)) gtx();
+  }, gtx);
 };
 D.seriesInfo = function (id, ok, fail) {
   return O.api.get('get_series_info', '&series_id=' + O.enc(id), function (d) {

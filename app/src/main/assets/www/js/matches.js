@@ -74,7 +74,7 @@ function load(quiet) {
    The day's list gives the games; the channels are only in each game's own page, so those are
    fetched one by one (and kept: they do not change). */
 var T365 = { ts: 0, games: [], busy: false }, TVC = {}, MAP = {}, PEND = {}, tvDrawT = 0;
-var Q365 = 'appTypeId=5&langId=27&userCountryId=131&timezoneName=';
+var Q365 = 'appTypeId=5&userCountryId=131&timezoneName=';   /* list in English (to match ESPN's names), channels in Arabic */
 var CMP = { 'esp.1': 11, 'eng.1': 7, 'ger.1': 25, 'ita.1': 17, 'fra.1': 35 };
 function tz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin'; } catch (e) { return 'Europe/Berlin'; } }
 function norm(n) {
@@ -100,7 +100,7 @@ function match365(e) {
     if (!g.homeCompetitor || !g.awayCompetitor) return;
     var gt = Date.parse(g.startTime) || 0; if (Math.abs(gt - e.t) > 20 * 60000) return;
     var sc = tside(e.h, g.homeCompetitor) + tside(e.a, g.awayCompetitor);
-    if (cid && g.competitionId === cid) sc += 0.5;
+    if (cid) { if (g.competitionId !== cid) return; sc += 0.3; }
     if (sc > bs) { bs = sc; best = g; }
   });
   return bs >= 0.9 ? best : null;

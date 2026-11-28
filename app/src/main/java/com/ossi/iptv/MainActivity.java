@@ -459,6 +459,33 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface public void speedStop() { speedRun++; }
+        /* plain HTTP GET outside the WebView (translation, match data): no CORS, no WebView blocking.
+           Result: window.__ossiFetch(id, status, base64Body) */
+        @JavascriptInterface public void fetch(final String url, final String id) {
+            new Thread(new Runnable() { @Override public void run() {
+                int code = 0; String body = "";
+                java.net.HttpURLConnection c = null;
+                try {
+                    c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                    c.setConnectTimeout(15000); c.setReadTimeout(20000);
+                    c.setInstanceFollowRedirects(true);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36");
+                    c.setRequestProperty("Accept", "application/json,*/*");
+                    code = c.getResponseCode();
+                    java.io.InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
+                    if (in != null) {
+                        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                        byte[] buf = new byte[32 * 1024]; int n;
+                        while ((n = in.read(buf)) > 0 && bo.size() < 8 * 1024 * 1024) bo.write(buf, 0, n);
+                        in.close();
+                        body = android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP);
+                    }
+                } catch (Exception e) { code = 0; }
+                finally { if (c != null) c.disconnect(); }
+                String sid = id.replaceAll("[^A-Za-z0-9_]", "");
+                js("window.__ossiFetch&&__ossiFetch('" + sid + "'," + code + ",'" + body + "')");
+            } }).start();
+        }
         @JavascriptInterface public void downloadUpdate(final String url) { MainActivity.this.downloadUpdate(url); }
         @JavascriptInterface public void installUpdate() {
             main.post(new Runnable() { @Override public void run() { MainActivity.this.installUpdate(); } });

@@ -15,3 +15,7 @@ for(const f of fs.readdirSync('out').filter(x=>x.startsWith('espn_'))){
   }
 }
 console.log('matched',hit,'/',tot);
+const G=T365.games;
+const cs=JSON.parse(fs.readFileSync('out/s365.json')).competitions||[];
+console.log('|COMP', cs.filter(c=>/turk|süper|super lig|ligue 1|trendyol/i.test(c.name)).map(c=>c.id+':'+c.name+':'+c.countryId).join(' ; '));
+console.log('|FR35', G.filter(g=>g.competitionId===35).map(g=>g.homeCompetitor.name+'-'+g.awayCompetitor.name+'@'+g.startTime).join(' ; '));
