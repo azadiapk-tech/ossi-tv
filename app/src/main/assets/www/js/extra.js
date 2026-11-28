@@ -165,8 +165,8 @@ function submit() {
     done();
     why = String(why || '');
     /* the server answered, but not with a login reply (e.g. HTTP 403): show what it said */
-    lerr(/^HTTP/.test(why) ? t('loginSrv') + ' ' + why : t('loginNet'));
-  }, 1);
+    lerr(/^HTTP/.test(why) ? t('loginSrv') + ' ' + why : why === 'timeout' ? t('loginSlow') : t('loginNet'));
+  }, 0, 20000);   /* one try, 20 s: a blocked/unreachable server no longer leaves "checking…" for minutes */
 }
 LG.show = function () {
   if (!lbuilt) lbuild();

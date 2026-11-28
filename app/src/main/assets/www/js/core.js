@@ -128,7 +128,7 @@ O.api = {
     return p.host + '/' + kind + '/' + O.enc(p.user) + '/' + O.enc(p.pass) + '/' + O.enc(id) + '.' + ext;
   }
 };
-O.getJSON = function (url, ok, fail, tries) {
+O.getJSON = function (url, ok, fail, tries, ms) {
   var ctl = { x: null, dead: false, abort: function () { ctl.dead = true; try { ctl.x.abort(); } catch (e) {} } };
   (function attempt(n) {
     var x = new XMLHttpRequest(), fin = false;
@@ -140,7 +140,7 @@ O.getJSON = function (url, ok, fail, tries) {
       else if (fail) fail(msg);
     }
     x.open('GET', url, true);
-    x.timeout = 60000;
+    x.timeout = ms || 60000;
     x.onload = function () {
       if (fin || ctl.dead) return;
       if (x.status < 200 || x.status >= 300) { bad('HTTP ' + x.status + snip(x)); return; }

@@ -158,6 +158,7 @@ var T = {
   stoppedAt: ['توقفت عند', 'You stopped at', 'Gestoppt bei'],
   netSpeed: ['سرعة الإنترنت', 'Internet speed', 'Internet-Geschwindigkeit'],
   srvPing: ['زمن الاستجابة (سيرفر الاشتراك)', 'Latency (IPTV server)', 'Latenz (IPTV-Server)'],
+  loginSlow: ['السيرفر لا يرد من هذه الشبكة. جرّب شبكة أخرى (واي فاي / بيانات الهاتف)', 'The server does not answer on this network. Try another network (Wi-Fi / mobile data)', 'Der Server antwortet in diesem Netz nicht. Anderes Netz versuchen (WLAN / mobile Daten)'],
   loginSrv: ['السيرفر رد بشكل غير متوقع:', 'The server gave an unexpected answer:', 'Unerwartete Antwort vom Server:'],
   logoutMsg: ['سيتم الرجوع إلى شاشة تسجيل الدخول', 'You will return to the sign-in screen', 'Zurück zum Anmeldebildschirm'],
   expiresOn: ['ينتهي', 'Expires', 'Läuft ab'],
