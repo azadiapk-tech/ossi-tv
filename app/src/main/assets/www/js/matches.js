@@ -8,7 +8,7 @@ var O = window.O, $ = O.$, esc = O.esc, t = O.t, K = O.K, M = O.modal;
 var LEAGUES = [
   { id: 'all', n: 'mAll', f: '⚽' },
   { id: 'esp.1', n: 'lgEsp', f: '🇪🇸' },
-  { id: 'eng.1', n: 'lgEng', f: '🏴' },
+  { id: 'eng.1', n: 'lgEng', f: '<svg class="flg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><rect x="12.5" width="5" height="20" fill="#ce1124"/><rect y="7.5" width="30" height="5" fill="#ce1124"/></svg>' },
   { id: 'ger.1', n: 'lgGer', f: '🇩🇪' },
   { id: 'ita.1', n: 'lgIta', f: '🇮🇹' },
   { id: 'fra.1', n: 'lgFra', f: '🇫🇷' },
