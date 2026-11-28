@@ -5,27 +5,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          UA='Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36'
-          B="appTypeId=5&langId=27&timezoneName=Asia/Riyadh&userCountryId=131"
-          curl -s -A "$UA" "https://webws.365scores.com/web/games/allscores/?$B&sports=1&startDate=28/11/2026&endDate=29/11/2026&showOdds=false" > all.json
-          python3 - <<'PY'
-          import json
-          d=json.load(open('all.json'));g=d['games']
-          top=[x for x in g if x['competitionId'] in (25,11,7,17,35,649)]
-          print('top',len(top),'hasTV',sum(1 for x in top if x.get('hasTVNetworks')))
-          x=top[0] if top else g[0]
-          print(json.dumps({k:x[k] for k in ('id','competitionId','startTime','statusGroup','statusText','gameTimeDisplay','hasTVNetworks') if k in x},ensure_ascii=False))
-          print(json.dumps(x['homeCompetitor'],ensure_ascii=False)[:600])
-          open('ids','w').write(' '.join(str(y['id']) for y in top if y.get('hasTVNetworks'))[:200])
-          PY
-          for id in $(cat ids | tr ' ' '\n' | head -3); do
-            curl -s -A "$UA" "https://webws.365scores.com/web/game/?$B&gameId=$id" > g.json
-            python3 -c "
-          import json;g=json.load(open('g.json'))['game']
-          print(g['homeCompetitor']['name'],'-',g['awayCompetitor']['name'])
-          for k in g:
-            if 'tv' in k.lower() or 'broad' in k.lower(): print(k, json.dumps(g[k],ensure_ascii=False)[:900])
-          "
-          done
-          curl -s -I -A "$UA" -H "Origin: null" "https://webws.365scores.com/web/games/allscores/?$B&sports=1" | grep -i access-control
-          curl -s -I -A "$UA" -H "Origin: null" "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=ar&q=Hi" | grep -i "access-control\|HTTP/"
+          mkdir out; cd out
+          D=$(TZ=Europe/Berlin date +%Y%m%d); D2=$(TZ=Europe/Berlin date +%d/%m/%Y)
+          for c in esp.1 eng.1 ger.1 ita.1 fra.1 tur.1 fifa.friendly; do curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/$c/scoreboard?dates=$D&lang=ar&region=sa" > espn_$c.json; done
+          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=27&userCountryId=131&timezoneName=Europe%2FBerlin&sports=1&startDate=$D2&endDate=$D2&showOdds=false" > s365.json
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with: { name: data, path: out }
