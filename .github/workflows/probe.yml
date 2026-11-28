@@ -1,0 +1,20 @@
+name: probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for k in 0 1; do D2=$(TZ=Europe/Berlin date -d "+$k day" +%d/%m/%Y)
+          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=1&userCountryId=131&timezoneName=Europe%2FBerlin&sports=1&startDate=$D2&endDate=$D2&showOdds=false" > a$k.json; done
+          python3 - <<'PY'
+          import json,subprocess
+          g=[x for k in (0,1) for x in json.load(open(f'a{k}.json'))['games'] if x['competitionId']==78]
+          print('tur games',len(g),[ (x['homeCompetitor']['name'],x.get('hasTVNetworks')) for x in g])
+          for x in g[:2]:
+            for c in (131,80,129,1,6,104):
+              r=subprocess.run(['curl','-s','-A','Mozilla/5.0',f"https://webws.365scores.com/web/game/?appTypeId=5&langId=27&userCountryId={c}&timezoneName=Europe%2FBerlin&gameId={x['id']}"],capture_output=True,text=True).stdout
+              try: tv=json.loads(r)['game'].get('tvNetworks')
+              except Exception as e: tv='ERR'
+              print(x['homeCompetitor']['name'],'country',c,json.dumps(tv,ensure_ascii=False)[:300])
+          PY
