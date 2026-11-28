@@ -1,5 +1,6 @@
-/* Matches: today's football results (live / finished / upcoming) for the chosen leagues.
-   Data: ESPN's public scoreboard (no account). OK on a match plays the channel linked to its league. */
+/* Matches: football results of today (live / finished / upcoming) and tomorrow's games, for the chosen leagues.
+   Data: ESPN's public scoreboard (no account), live state and channels from 365Scores, Turkish channels from
+   beIN SPORTS Türkiye and Sporx. */
 (function () {
 'use strict';
 var O = window.O, $ = O.$, esc = O.esc, t = O.t, K = O.K, M = O.modal;
@@ -7,6 +8,7 @@ var O = window.O, $ = O.$, esc = O.esc, t = O.t, K = O.K, M = O.modal;
 /* leagues shown in the left column; "nat" = national teams (several ESPN competitions) */
 var LEAGUES = [
   { id: 'all', n: 'mAll', f: '⚽' },
+  { id: 'uefa.champions', n: 'lgUcl', f: '🇪🇺' },
   { id: 'esp.1', n: 'lgEsp', f: '🇪🇸' },
   { id: 'eng.1', n: 'lgEng', f: '<svg class="flg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><rect x="12.5" width="5" height="20" fill="#ce1124"/><rect y="7.5" width="30" height="5" fill="#ce1124"/></svg>' },
   { id: 'ger.1', n: 'lgGer', f: '🇩🇪' },
@@ -22,6 +24,19 @@ var MA = O.matches = {};
 
 function ymd(d) { return d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2); }
 function srcOf(lg) { return lg.src || [lg.id]; }
+function plusDays(n) { var d = new Date(); d.setDate(d.getDate() + n); return d; }
+function dayOf(ms) {   /* 0 = today, 1 = tomorrow (local calendar days) */
+  var a = new Date(ms), b = new Date(); a.setHours(0, 0, 0, 0); b.setHours(0, 0, 0, 0); return Math.round((a - b) / 864e5);
+}
+function dm(ms) { var d = new Date(ms); return d.getDate() + '/' + (d.getMonth() + 1); }
+function wday(ms) {
+  var loc = { ar: 'ar', en: 'en-GB', de: 'de-DE' }[O.lang()] || 'en-GB';
+  try { return new Date(ms).toLocaleDateString(loc, { weekday: 'long' }); } catch (e) { return ''; }
+}
+/* "اليوم 28/11" / "غداً 29/11" */
+function dLabel(ms) { var n = dayOf(ms); return (n <= 0 ? t('mToday') : n === 1 ? t('mTomorrow') : wday(ms)) + '  ' + dm(ms); }
+/* "غداً، الأحد 29/11" */
+function dLong(ms) { var n = dayOf(ms); return (n === 0 ? t('mToday') + '، ' : n === 1 ? t('mTomorrow') + '، ' : '') + wday(ms) + ' ' + dm(ms); }
 function leagueOf(code) { for (var i = 1; i < LEAGUES.length; i++) if (srcOf(LEAGUES[i]).indexOf(code) > -1) return LEAGUES[i]; return LEAGUES[0]; }
 
 /* ---------- data ---------- */
@@ -54,28 +69,41 @@ function parse(code, d) {
   });
   return out;
 }
-function espnUrl(code) {   /* the last part only stops any cache from giving an old answer */
-  return 'https://site.api.espn.com/apis/site/v2/sports/soccer/' + code + '/scoreboard?dates=' + ymd(new Date()) + '&lang=ar&region=sa&_=' + Math.floor(Date.now() / 20000);
+function espnUrl(code, day) {   /* the last part only stops any cache from giving an old answer */
+  return 'https://site.api.espn.com/apis/site/v2/sports/soccer/' + code + '/scoreboard?dates=' + ymd(day || new Date()) + '&lang=ar&region=sa&_=' + Math.floor(Date.now() / 20000);
 }
+var TMR = { day: '', ts: 0, ev: [] };   /* tomorrow's games: asked again every 15 minutes, not every minute */
 function load(quiet) {
   var tk = ++S.tok, codes = [], got = [], left;
   LEAGUES.forEach(function (l, i) { if (i) codes = codes.concat(srcOf(l)); });
   left = codes.length; S.err = false;
   if (!quiet) { S.loading = true; draw(); }
-  var fails = 0;
+  var fails = 0, d1 = plusDays(1), k1 = ymd(d1), tmr = null, tmrOk = 0;
+  if (TMR.day !== k1 || Date.now() - TMR.ts > 15 * 60000) { tmr = []; left += codes.length; }
   schedule();                                   /* the next refresh is planned even if this one fails */
   codes.forEach(function (code) {
     O.getJSON(espnUrl(code),
       function (d) { if (tk !== S.tok) return; got = got.concat(parse(code, d)); done(); },
       function () { if (tk !== S.tok) return; fails++; done(); }, 1, 20000);
+    if (tmr) O.getJSON(espnUrl(code, d1),
+      function (d) { if (tk !== S.tok) return; tmrOk++; tmr = tmr.concat(parse(code, d)); done(); },
+      function () { if (tk !== S.tok) return; done(); }, 1, 20000);
   });
   function done() {
     if (--left > 0) return;
     S.loading = false;
+    if (tmr && tmrOk) TMR = { day: k1, ts: Date.now(), ev: tmr };
     if (!got.length && fails === codes.length) { if (!S.ev.length) S.err = true; draw(); return; }
     S.ts = Date.now();
-    got.sort(function (x, y) { return x.t - y.t; });
-    S.ev = got;
+    /* today's games (and any still running), then tomorrow's */
+    var seen = {}, all = [];
+    got.concat(TMR.day === k1 ? TMR.ev : []).forEach(function (e) {
+      var n = dayOf(e.t);
+      if (seen[e.id] || !(e.state === 'live' || n === 0 || n === 1)) return;
+      seen[e.id] = 1; all.push(e);
+    });
+    all.sort(function (x, y) { return x.t - y.t; });
+    S.ev = all;
     refresh();                                  /* the last known 365Scores state right away (no flicker) */
     sync365(); btrLoad();
     if (DET && DET.e.state !== 'up') det365(DET.e);
@@ -93,8 +121,9 @@ function refreshSoon() { clearTimeout(refT); refT = setTimeout(refresh, 250); }
    and the channels (Arabic names). The day's list is used once to find each game; after that only
    the games still running are asked for, every minute (a few KB). ---------- */
 var R365 = 'https://webws.365scores.com/web/';
-var T365 = { ts: 0, day: '', busy: false, failAt: 0 }, GI = {}, MAP = {}, TVC = {}, PEND = {}, GOALS = {};
-var CMP = { 'esp.1': 11, 'eng.1': 7, 'ger.1': 25, 'ita.1': 17, 'fra.1': 35, 'tur.1': 78 };
+var T365 = { ts: 0, day: '', busy: false, failAt: 0, allAt: 0, gen: 0 }, GI = {}, MAP = {}, TVC = {}, PEND = {}, GOALS = {};
+var CMP = { 'esp.1': 11, 'eng.1': 7, 'ger.1': 25, 'ita.1': 17, 'fra.1': 35, 'tur.1': 78, 'uefa.champions': 572 };
+function d365(n) { var d = plusDays(n); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
 function tz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin'; } catch (e) { return 'Europe/Berlin'; } }
 /* lang 1 = English (to compare with ESPN's names), 27 = Arabic (channels, scorers); the region decides the channels */
 function q365(lang) { return 'appTypeId=5&langId=' + lang + '&userCountryId=131&timezoneName=' + encodeURIComponent(tz()); }
@@ -132,8 +161,8 @@ function match365(e) {
 function matchAll() {
   var changed = false;
   S.ev.forEach(function (e) {
-    var m = MAP[e.id]; if (m && (m.id || m.none === T365.ts)) return;
-    var r = match365(e); MAP[e.id] = r || { none: T365.ts }; if (r) changed = true;
+    var m = MAP[e.id]; if (m && (m.id || m.none === T365.gen)) return;
+    var r = match365(e); MAP[e.id] = r || { none: T365.gen }; if (r) changed = true;
   });
   if (changed) mapSave();
   return changed;
@@ -157,21 +186,33 @@ function apply365() {
     if (gl && gl.length >= e.goals.length) e.goals = gl.map(function (x) { return m.sw ? { side: x.side === 'h' ? 'a' : 'h', min: x.min, name: x.name, og: x.og, pen: x.pen } : x; });
   });
 }
+function missing365() { return S.ev.filter(function (e) { return !MAP[e.id] || !MAP[e.id].id; }); }
 function sync365() {
+  if (T365.busy) { live365(tvDetails); return; }
   var today = ymd(new Date());
-  var missing = S.ev.some(function (e) { return !MAP[e.id] || !MAP[e.id].id; });
-  var listOld = T365.day !== today || (missing && Date.now() - T365.ts > 60 * 60000);
-  if (missing && listOld && !T365.busy && Date.now() - T365.failAt > 5 * 60000) { full365(); return; }
+  if ((T365.day !== today || Date.now() - T365.ts > 30 * 60000) && Date.now() - T365.failAt > 5 * 60000) { list365(); return; }
+  if (missing365().length && Date.now() - T365.allAt > 60 * 60000) { all365(); return; }
   live365(tvDetails);
 }
-function full365() {
+function addGames(r) { ((r && r.games) || []).forEach(function (g) { GI[g.id] = g; }); T365.gen++; }
+/* our leagues, today and tomorrow (a few dozen games) */
+function list365() {
   T365.busy = true;
-  var now = new Date(), d = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear(), day = ymd(now);
-  O.httpJSON(R365 + 'games/allscores/?' + q365(1) + '&sports=1&startDate=' + d + '&endDate=' + d + '&showOdds=false', function (r) {
-    T365.busy = false; T365.ts = Date.now(); T365.day = day;
-    ((r && r.games) || []).forEach(function (g) { GI[g.id] = g; });
-    matchAll(); refresh(); tvDetails();
-  }, function () { T365.busy = false; T365.failAt = Date.now(); live365(); });
+  var ids = Object.keys(CMP).map(function (k) { return CMP[k]; }).join(',');
+  O.httpJSON(R365 + 'games/?' + q365(1) + '&competitions=' + ids + '&startDate=' + d365(0) + '&endDate=' + d365(1), function (r) {
+    T365.busy = false; T365.ts = Date.now(); T365.day = ymd(new Date());
+    addGames(r); matchAll(); refresh();
+    if (missing365().length && Date.now() - T365.allAt > 60 * 60000) all365(); else live365(tvDetails);
+  }, function () { T365.busy = false; T365.failAt = Date.now(); live365(tvDetails); });
+}
+/* games outside those leagues (national teams): the whole day list, at most once an hour */
+function all365() {
+  var mi = missing365(), a = 1, b = 0;
+  mi.forEach(function (e) { var n = Math.max(0, Math.min(1, dayOf(e.t))); a = Math.min(a, n); b = Math.max(b, n); });
+  T365.busy = true; T365.allAt = Date.now();
+  O.httpJSON(R365 + 'games/allscores/?' + q365(1) + '&sports=1&startDate=' + d365(a) + '&endDate=' + d365(b) + '&showOdds=false', function (r) {
+    T365.busy = false; addGames(r); matchAll(); refresh(); live365(tvDetails);
+  }, function () { T365.busy = false; live365(tvDetails); });
 }
 /* every minute: only the games that are running, about to start or just ended */
 function live365(cb) {
@@ -217,7 +258,7 @@ function det365get(id, cb) {          /* channels */
     if (g) {
       var n = [];
       (g.tvNetworks || []).forEach(function (x) { if (x && x.name && n.indexOf(x.name) < 0) n.push(x.name); });
-      TVC[id] = n; if (n.length) tvcSave();
+      TVC[id] = n; TVT[id] = Date.now(); if (n.length) tvcSave();
       refreshSoon();
     }
     if (cb) cb();
@@ -239,10 +280,13 @@ function goals365(id) {               /* scorers */
   });
 }
 function tvcSave() {
-  var keep = {}; Object.keys(TVC).forEach(function (k) { if (TVC[k] && TVC[k].length) keep[k] = TVC[k]; });
-  O.store.gs('tv365', { day: ymd(new Date()), tv: keep });
+  var keep = {}, old = Date.now() - 3 * 864e5;
+  Object.keys(TVC).forEach(function (k) { if (TVC[k] && TVC[k].length) keep[k] = { n: TVC[k], t: TVT[k] || Date.now() }; });
+  Object.keys(keep).forEach(function (k) { if (keep[k].t < old) delete keep[k]; });
+  O.store.gs('tv365b', keep);
 }
-(function () { var s = O.store.g('tv365', null); if (s && s.day === ymd(new Date()) && s.tv) Object.keys(s.tv).forEach(function (k) { TVC[k] = s.tv[k]; }); })();
+var TVT = {};
+(function () { var s = O.store.g('tv365b', null) || {}; Object.keys(s).forEach(function (k) { if (s[k] && s[k].n) { TVC[k] = s[k].n; TVT[k] = s[k].t; } }); })();
 function det365(e) { var m = MAP[e.id]; if (m && m.id) goals365(m.id); }
 
 /* ---------- Turkish channels ----------
@@ -445,7 +489,7 @@ function drawDet() {
   if (!DET) return;
   var e = DET.e, l = leagueOf(e.code), mid;
   if (e.off) mid = '<b class="md-time">' + O.fmtHM(e.t) + '</b><span class="mt-fin">' + esc(t(e.off === 'post' ? 'mPostp' : 'mSusp')) + '</span>';
-  else if (e.state === 'up') mid = '<b class="md-time">' + O.fmtHM(e.t) + '</b><span class="mt-up">' + esc(t('mToday')) + '</span>';
+  else if (e.state === 'up') mid = '<b class="md-time">' + O.fmtHM(e.t) + '</b><span class="mt-up">' + esc(dLabel(e.t)) + '</span>';
   else mid = '<b class="md-sc"><span dir="ltr">' + esc(e.a.s) + ' - ' + esc(e.h.s) + '</span></b>' +
     (e.state === 'live' ? '<span class="mt-live">● ' + esc(t('mLive')) + ' ' + esc(e.clock) + '</span>' : '<span class="mt-fin">' + esc(t('mEnded')) + '</span>');
   function goals(side) {
@@ -457,7 +501,7 @@ function drawDet() {
     '<div class="md-teams"><div class="md-t">' + logo(e.h) + '<b dir="auto">' + esc(e.h.n) + '</b><div class="md-g">' + goals('h') + '</div></div>' +
     '<div class="md-mid">' + mid + '</div>' +
     '<div class="md-t">' + logo(e.a) + '<b dir="auto">' + esc(e.a.n) + '</b><div class="md-g">' + goals('a') + '</div></div></div>' +
-    '<div class="md-info">🕐 ' + O.fmtHM(e.t) + (e.venue ? '   •   🏟 ' + esc(e.venue) : '') + '</div>' +
+    '<div class="md-info">📅 ' + esc(dLong(e.t)) + '   •   🕐 ' + O.fmtHM(e.t) + (e.venue ? '   •   🏟 ' + esc(e.venue) : '') + '</div>' +
     (e.tv.length ? '<div class="md-tv">📺 ' + esc(t('mOnTv')) + ': <b>' + esc(e.tv.join('  •  ')) + '</b></div>' : '') + '<div class="md-btns">';
   detBtns().forEach(function (x, i) { h += '<b class="md-b' + (i === DET.b ? ' focus' : '') + '" data-b="' + i + '">' + esc(x.l) + '</b>'; });
   $('mtDet').innerHTML = h + '</div></div>';
@@ -478,7 +522,7 @@ function hm(ms) { return O.fmtHM(ms); }
 function row(e, i) {
   var mid, st;
   if (e.off) { mid = '<b class="mt-time">' + hm(e.t) + '</b>'; st = '<span class="mt-fin">' + esc(t(e.off === 'post' ? 'mPostp' : 'mSusp')) + '</span>'; }
-  else if (e.state === 'up') { mid = '<b class="mt-time">' + hm(e.t) + '</b>'; st = '<span class="mt-up">' + esc(t('mToday')) + '</span>'; }
+  else if (e.state === 'up') { mid = '<b class="mt-time">' + hm(e.t) + '</b>'; st = '<span class="mt-up' + (dayOf(e.t) > 0 ? ' mt-tmr' : '') + '">' + esc(dLabel(e.t)) + '</span>'; }
   else {
     mid = '<b class="mt-sc"><span dir="ltr">' + esc(e.a.s) + ' - ' + esc(e.h.s) + '</span></b>';
     st = e.state === 'live' ? '<span class="mt-live">● ' + esc(t('mLive')) + ' ' + esc(e.clock) + '</span>' : '<span class="mt-fin">' + esc(t('mEnded')) + '</span>';

@@ -698,3 +698,4 @@ html.pip #pDim{display:none}
 svg.flg{display:inline-block;width:1.25em;height:.84em;vertical-align:-.08em;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
 .mt-src{display:flex;gap:26px;align-items:center}.mt-upd b{color:#9fb0d4;font-weight:700}
 #mtAlert .ma-l{display:flex;align-items:center;justify-content:center;margin-top:10px}
+.mt-up.mt-tmr{color:#c4b5fd}.mt-meta .mt-up{white-space:nowrap}
