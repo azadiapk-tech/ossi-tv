@@ -155,9 +155,9 @@ O.getJSON = function (url, ok, fail, tries, ms) {
   return ctl;
 };
 
-/* GET JSON from an outside site (translation, match data). On Android the request runs natively
-   (no WebView/CORS limits); elsewhere a normal XHR. */
-O.httpJSON = (function () {
+/* GET from an outside site (translation, match data, TV guide). On Android the request runs natively
+   (no WebView/CORS limits); elsewhere a normal request. ok(text) / ok(json) */
+O.httpGet = (function () {
   var seq = 0, wait = {};
   window.__ossiFetch = function (id, status, b64) {
     var w = wait[id]; if (!w) return; delete wait[id]; clearTimeout(w.t);
@@ -168,20 +168,31 @@ O.httpJSON = (function () {
       if (window.TextDecoder) { var u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); txt = new TextDecoder('utf-8').decode(u); }
       else txt = decodeURIComponent(escape(bin));
     } catch (e) { w.fail('decode'); return; }
-    var d; try { d = JSON.parse(txt); } catch (e) { w.fail('no JSON'); return; }
-    w.ok(d);
+    w.ok(txt);
   };
+  function xhr(url, ok, fail) {
+    var x = new XMLHttpRequest(), fin = false;
+    function bad(m) { if (!fin) { fin = true; fail(m); } }
+    x.open('GET', url, true); x.timeout = 30000;
+    x.onload = function () { if (fin) return; if (x.status >= 200 && x.status < 300) { fin = true; ok(x.responseText); } else bad('HTTP ' + x.status); };
+    x.onerror = function () { bad('network'); }; x.ontimeout = function () { bad('timeout'); };
+    try { x.send(); } catch (e) { bad('network'); }
+  }
   return function (url, ok, fail) {
     fail = fail || function () {};
     var N = window.OssiNative;
     if (N && N.fetch) {
       var id = 'f' + (++seq);
       wait[id] = { ok: ok, fail: fail, t: setTimeout(function () { if (wait[id]) { delete wait[id]; fail('timeout'); } }, 40000) };
-      try { N.fetch(url, id); return; } catch (e) { delete wait[id]; }
+      try { N.fetch(url, id); return; } catch (e) { clearTimeout(wait[id].t); delete wait[id]; }
     }
-    O.getJSON(url, ok, fail, 1);
+    xhr(url, ok, fail);
   };
 })();
+O.httpJSON = function (url, ok, fail) {
+  fail = fail || function () {};
+  O.httpGet(url, function (txt) { var d; try { d = JSON.parse(txt); } catch (e) { fail('no JSON'); return; } ok(d); }, fail);
+};
 
 /* ---------- data layer ---------- */
 var D = O.data = {};

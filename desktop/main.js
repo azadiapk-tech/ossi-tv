@@ -6,6 +6,10 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 const UA = 'OssiTV/' + app.getVersion() + ' (Windows; Electron)';
+/* sports info sites (results, channels, translation) get the engine's normal browser identity;
+   some of them send an empty page to unknown apps */
+const WEB_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' + process.versions.chrome + ' Safari/537.36';
+const WEB_HOSTS = /(^|\.)(beinsports\.com\.tr|365scores\.com|espn\.com|google\.com|googleapis\.com)$/i;
 app.userAgentFallback = UA;
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disable-features', 'UserAgentClientHint');
@@ -40,7 +44,8 @@ function create() {
       for (const k of Object.keys(h)) {
         if (/^(origin|referer|sec-ch-ua.*|sec-fetch-.*)$/i.test(k)) delete h[k];
       }
-      h['User-Agent'] = UA;
+      let host = ''; try { host = new URL(d.url).hostname; } catch (e) {}
+      h['User-Agent'] = WEB_HOSTS.test(host) ? WEB_UA : UA;
     }
     cb({ requestHeaders: h });
   });

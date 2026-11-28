@@ -154,7 +154,7 @@ document.addEventListener('visibilitychange', function () {
   if (document.hidden) { hiddenAt = Date.now(); return; }
   if (hiddenAt) { var away = Date.now() - hiddenAt; hiddenAt = 0; O.app.autoRefresh(away); }
 });
-window.__ossiResume = function (awayMs) { O.app.autoRefresh(+awayMs || 0); };   /* sent by the Android app */
+window.__ossiResume = function (awayMs) { O.app.autoRefresh(+awayMs || 0); if (O.matches && O.matches.resume) O.matches.resume(); };   /* sent by the Android app */
 
 document.addEventListener('keydown', onKey);
 O.app.key = function (code) { onKey({ keyCode: code, which: code, preventDefault: function () {} }); };
