@@ -206,31 +206,44 @@ function tvDetails() {
     }
   })();
 }
-/* one game's own page: channels + goals (Arabic names) */
-function det365get(id, cb) {
-  O.httpJSON(R365 + 'game/?' + q365(27) + '&gameId=' + id, function (r) {
+/* one game's own page. Channels in Arabic (once per game, kept); scorers in English, like ESPN's
+   (asked when the match window opens, and every minute while it is open) */
+function game365(id, lang, cb) {
+  O.httpJSON(R365 + 'game/?' + q365(lang) + '&gameId=' + id, function (r) { cb((r && r.game) || null); }, function () { cb(null); });
+}
+function det365get(id, cb) {          /* channels */
+  game365(id, 27, function (g) {
     delete PEND[id];
-    var g = (r && r.game) || {}, n = [];
-    (g.tvNetworks || []).forEach(function (x) { if (x && x.name && n.indexOf(x.name) < 0) n.push(x.name); });
-    TVC[id] = n; if (n.length) tvcSave();
+    if (g) {
+      var n = [];
+      (g.tvNetworks || []).forEach(function (x) { if (x && x.name && n.indexOf(x.name) < 0) n.push(x.name); });
+      TVC[id] = n; if (n.length) tvcSave();
+      refreshSoon();
+    }
+    if (cb) cb();
+  });
+}
+function goals365(id) {               /* scorers */
+  var k = 'g' + id; if (PEND[k]) return; PEND[k] = 1;
+  game365(id, 1, function (g) {
+    delete PEND[k]; if (!g) return;
     var mem = {}, hid = g.homeCompetitor && g.homeCompetitor.id, gl = [];
     (g.members || []).forEach(function (x) { mem[x.id] = x.shortName || x.name; });
     (g.events || []).forEach(function (x) {
       var ty = x.eventType || {}; if (ty.id !== 1) return;          /* 1 = goal */
-      var sub = String(ty.subTypeName || '');
+      var sub = String(ty.subTypeName || '') + ' ' + String(ty.name || '');
       gl.push({ side: x.competitorId === hid ? 'h' : 'a', min: x.gameTimeDisplay || '', name: mem[x.playerId] || '',
-        pen: /جزاء|penalt/i.test(sub), og: /عكس|ذاتي|مرما|own/i.test(sub) });
+        pen: /penalt|جزاء/i.test(sub), og: /own|عكس|ذاتي|مرما/i.test(sub) });
     });
-    if (gl.length || (g.statusGroup === 3 || g.statusGroup === 4)) GOALS[id] = gl;
-    refreshSoon(); if (cb) cb();
-  }, function () { delete PEND[id]; if (cb) cb(); });
+    GOALS[id] = gl; refreshSoon();
+  });
 }
 function tvcSave() {
   var keep = {}; Object.keys(TVC).forEach(function (k) { if (TVC[k] && TVC[k].length) keep[k] = TVC[k]; });
   O.store.gs('tv365', { day: ymd(new Date()), tv: keep });
 }
 (function () { var s = O.store.g('tv365', null); if (s && s.day === ymd(new Date()) && s.tv) Object.keys(s.tv).forEach(function (k) { TVC[k] = s.tv[k]; }); })();
-function det365(e) { var m = MAP[e.id]; if (m && m.id && !PEND[m.id]) { PEND[m.id] = 1; det365get(m.id); } }
+function det365(e) { var m = MAP[e.id]; if (m && m.id) goals365(m.id); }
 
 /* ---------- Turkish channels ----------
    1) beIN SPORTS Türkiye's own TV guide (one public page per channel: beIN SPORTS 1-4, HABER)

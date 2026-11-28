@@ -294,22 +294,27 @@ O.searchKb = function (inp) {
 };
 
 
-/* ================= digital clock (top left; switched on in the player's ☰ options, remembered) ================= */
+/* ================= digital clock =================
+   In the lists it always sits in the top bar next to the home button (every section, phone and TV);
+   in the player it is switched on in the ☰ options (remembered). Same time and format everywhere,
+   also in the channel info bar at the bottom. */
 var CK = O.clock = {}, ckEl = null;
-function p2(n) { return (n < 10 ? '0' : '') + n; }
 CK.on = function () { return !!O.cfg.get('clock', false); };
 CK.toggle = function () { O.cfg.set('clock', !CK.on()); CK.tick(); };
+var ROOTS = { live: 'live', movies: 'vodm', series: 'vods', detail: 'detail', matches: 'matches', settings: 'settings' };
 CK.tick = function () {
   if (!ckEl) { ckEl = document.createElement('div'); ckEl.id = 'clock'; ckEl.className = 'hidden'; var st = $('stage'); if (!st) return; st.appendChild(ckEl); }
   var cur = O.app && O.app.cur ? O.app.cur() : '', inPl = !!(O.pui && O.pui.active);
-  var show = CK.on() && (inPl || /^(live|movies|series|detail|matches)$/.test(cur));
+  var tx = O.fmtClock(new Date());
+  var bar = document.querySelector('#pInfo .rt1'); if (bar && bar.textContent !== tx) bar.textContent = tx;
+  var show = inPl ? CK.on() : !!ROOTS[cur];
   ckEl.classList.toggle('hidden', !show);
   ckEl.classList.toggle('inpl', inPl);
   if (!show) return;
-  var d = new Date(), tx = p2(d.getHours()) + ':' + p2(d.getMinutes()); if (ckEl.textContent !== tx) ckEl.textContent = tx;
+  if (ckEl.textContent !== tx) ckEl.textContent = tx;
   /* in the player: top right corner; in the lists: right next to the home button(s) */
   if (inPl) { ckEl.style.left = ((O.stageW || 1920) - ckEl.offsetWidth - 40) + 'px'; return; }
-  var root = $({ live: 'live', movies: 'vodm', series: 'vods', detail: 'detail', matches: 'matches' }[cur]), x = 0;
+  var root = $(ROOTS[cur]), x = 0;
   if (root) [].forEach.call(root.querySelectorAll('.hbtn'), function (b) { if (b.offsetParent !== null && (!x || b.offsetLeft < x)) x = b.offsetLeft; });
   ckEl.style.left = Math.max(300, (x || 1790) - ckEl.offsetWidth - 24) + 'px';
 };
