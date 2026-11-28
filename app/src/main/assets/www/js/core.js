@@ -367,6 +367,9 @@ O.recent = {
     var l = O.recent.list(type).filter(function (x) { return String(x.id) !== String(item.id); });
     item.ts = Date.now();
     l.unshift(item); O.store.ps('recent.' + type, l.slice(0, 20));
+  },
+  remove: function (type, id) {
+    O.store.ps('recent.' + type, O.recent.list(type).filter(function (x) { return String(x.id) !== String(id); }));
   }
 };
 O.pos = {

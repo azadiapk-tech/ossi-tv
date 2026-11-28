@@ -40,7 +40,8 @@ function contItems() {
   O.recent.list('series').forEach(function (it) {
     var last = O.store.p('lastEp.' + it.id, null), p = last && last.e ? O.pos.get('series:' + last.e) : null;
     out.push({ k: 'series', it: it, ts: it.ts || 0, pct: p && p.d > 0 ? p.t / p.d * 100 : 0,
-      sub: last && last.n != null ? t('seasonShort') + last.n + ' • E' + last.en : '' });
+      sub: (last && last.n != null ? t('seasonShort') + last.n + ' • E' + last.en : '') +
+           (p && p.d > 0 && p.t > 0 ? '  •  ' + t('left') + ' ' + O.fmtDur(p.d - p.t) : '') });
   });
   out.sort(function (a, b) { return b.ts - a.ts; });
   return out.slice(0, 16);
@@ -52,7 +53,7 @@ function drawCont() {
   cont.forEach(function (c, i) {
     var ini = esc(String(c.it.name || '').replace(/^[^:]*:\s*/, '').slice(0, 2));
     h += '<div class="cc" data-c="' + i + '"><div class="ci"><div class="ph">' + ini + '</div>' + (c.it.icon ? '<img src="' + esc(c.it.icon) + '" decoding="async" onerror="this.style.display=\'none\'">' : '') +
-      '<span class="ck">' + (c.k === 'movie' ? '🎬' : '📺') + '</span>' + (c.pct > 0 ? '<div class="pb" style="width:' + Math.min(100, c.pct).toFixed(1) + '%"></div>' : '') + '</div>' +
+      '<span class="ck">' + (c.k === 'movie' ? TILES[1].i : TILES[2].i) + '</span>' + (c.pct > 0 ? '<div class="pb" style="width:' + Math.min(100, c.pct).toFixed(1) + '%"></div>' : '') + '</div>' +
       '<div class="cn" dir="auto">' + esc(c.it.name) + '</div><div class="cs" dir="auto">' + esc(c.sub) + '</div></div>';
   });
   $('hCont').innerHTML = h;
@@ -109,6 +110,17 @@ H.show = function () {
 };
 H.hide = function () { clearInterval(clockT); if (root) root.classList.add('hidden'); };
 H.relang = function () { built = false; };
+/* ☰ on a "continue watching" card: remove it from the row */
+function contMenu(i) {
+  var c = cont[i]; if (!c) return;
+  O.modal.list(c.it.name, function () {
+    return [{ label: t('contDel'), onOk: function () {
+      O.modal.close(); O.recent.remove(c.k, c.it.id); drawCont();
+      if (!cont.length) area = 'tiles';
+      paint(); O.toast(t('contDeleted'));
+    } }];
+  }, { light: true });
+}
 H.onKey = function (e, k) {
   var used = true;
   if (k === K.BACK || k === K.ESC || k === K.EXIT) { if (area === 'cont') { area = 'tiles'; paint(); } else O.app.confirmExit(); }
@@ -123,6 +135,7 @@ H.onKey = function (e, k) {
     else if (k === K.RIGHT) { if (ci < cont.length - 1) ci++; paint(); }
     else if (k === K.UP) { area = 'tiles'; paint(); }
     else if (k === K.ENTER) openCont(ci);
+    else if (k === K.MENU) contMenu(ci);
     else used = false;
   }
   if (used) e.preventDefault();

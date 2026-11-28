@@ -130,6 +130,7 @@ var T = {
   trWait: ['جاري الترجمة…', 'Translating…', 'Wird übersetzt…'], trFail: ['تعذّرت الترجمة، تحقق من الإنترنت', 'Translation failed, check the internet', 'Übersetzung fehlgeschlagen, Internet prüfen'],
   trSame: ['النص أصلاً بلغة التطبيق', 'The text is already in the app language', 'Der Text ist schon in der App-Sprache'],
   dimOpt: ['تخفيف سطوع الشاشة', 'Dim the picture', 'Bild abdunkeln'], dimLvl: ['مستوى', 'Level', 'Stufe'],
+  contDel: ['حذف من متابعة المشاهدة', 'Remove from continue watching', 'Aus Weiterschauen entfernen'], contDeleted: ['تم الحذف من متابعة المشاهدة', 'Removed', 'Entfernt'],
   mMoveOne: ['نقل', 'Move', 'Verschieben'],
   mMoveMany: ['تحديد عدة عناصر للنقل', 'Select several to move', 'Mehrere zum Verschieben wählen'],
   hMenu: ['خيارات', 'Options', 'Optionen'],
