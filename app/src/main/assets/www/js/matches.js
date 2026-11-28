@@ -75,10 +75,11 @@ function load(quiet) {
    fetched one by one (and kept: they do not change). */
 var T365 = { ts: 0, games: [], busy: false }, TVC = {}, MAP = {}, PEND = {}, tvDrawT = 0;
 var Q365 = 'appTypeId=5&userCountryId=131&timezoneName=';   /* list in English (to match ESPN's names), channels in Arabic */
-var CMP = { 'esp.1': 11, 'eng.1': 7, 'ger.1': 25, 'ita.1': 17, 'fra.1': 35 };
+var CMP = { 'esp.1': 11, 'eng.1': 7, 'ger.1': 25, 'ita.1': 17, 'fra.1': 35, 'tur.1': 78 };
 function tz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin'; } catch (e) { return 'Europe/Berlin'; } }
 function norm(n) {
-  return String(n || '').toLowerCase().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/(^|\s)ال/g, '$1')
+  var x = String(n || ''); try { x = x.normalize('NFD').replace(/[\u0300-\u036f\u064b-\u065f]/g, ''); } catch (e) {}
+  return x.toLowerCase().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/(^|\s)ال/g, '$1')
     .replace(/\b(fc|cf|ac|sc|afc|ssc|as|club|de|ال)\b/g, '').replace(/[^\w\u0600-\u06ff]/g, '');
 }
 function sim(a, b) {

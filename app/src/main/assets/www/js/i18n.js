@@ -144,7 +144,7 @@ var T = {
   mLinked: ['تم ربط القناة:', 'Channel linked:', 'Sender verknüpft:'],
   mFail: ['تعذّر تحميل المباريات، تحقق من الإنترنت', 'Could not load the matches', 'Spiele konnten nicht geladen werden'],
   mNone: ['لا توجد مباريات هنا اليوم', 'No matches here today', 'Heute keine Spiele hier'],
-  mSrc: ['النتائج: ESPN', 'Scores: ESPN', 'Ergebnisse: ESPN'],
+  mSrc: ['المصادر: ESPN  •  365Scores', 'Scores: ESPN  •  Channels: 365Scores', 'Ergebnisse: ESPN  •  Sender: 365Scores'],
   mPickPkg: ['اختر باقة رياضية', 'Choose a sports package', 'Sportpaket wählen'], mNoSport: ['لا توجد باقة رياضية، اختر القناة من القائمة', 'No sports package found', 'Kein Sportpaket gefunden'],
   mAlertStart: ['تنبيه بالنتيجة', 'Score alerts', 'Tor-Hinweise'], mAlertStop: ['إيقاف التنبيه', 'Stop alerts', 'Hinweise aus'],
   mAlertOn: ['سيظهر تنبيه بالنتيجة أثناء مشاهدة القنوات', 'Score alerts on (while watching TV)', 'Tor-Hinweise an (beim Fernsehen)'], mAlertOff: ['تم إيقاف التنبيه', 'Alerts off', 'Hinweise aus'],
