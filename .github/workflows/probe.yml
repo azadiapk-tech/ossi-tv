@@ -8,7 +8,7 @@ jobs:
           E1=$(TZ=Europe/Berlin date +%Y%m%d); E2=$(TZ=Europe/Berlin date -d '+1 day' +%Y%m%d); E12=$(TZ=Europe/Berlin date -d '+12 day' +%Y%m%d)
           for spec in "eng.1 $E1-$E2" "tur.1 $E1-$E2" "uefa.champions $E1-$E12" "uefa.champions $E1-$E2"; do
             set -- $spec
-            curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/$1/scoreboard?dates=$2&lang=ar&region=sa" > e.json
+            curl -s --compressed "https://site.api.espn.com/apis/site/v2/sports/soccer/$1/scoreboard?dates=$2&lang=ar&region=sa" > e.json
             python3 - "$1" "$2" <<'PY'
           import json,sys,collections
           d=json.load(open('e.json'));ev=d.get('events',[])
