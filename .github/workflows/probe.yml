@@ -1,0 +1,33 @@
+name: probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          UA='Mozilla/5.0 (Linux; Android 14; SM-S928B Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0 Mobile Safari/537.36'
+          echo "== gtx"; curl -s -o /dev/null -w "%{http_code}\n" -A "$UA" -H "Origin: null" "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=Hello%20world"
+          curl -s -A "$UA" "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=Hello%20world" | head -c 300; echo
+          curl -s -I -A "$UA" -H "Origin: null" "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=Hello" | grep -i "access-control\|content-type"
+          echo "== dict"; curl -s -A "$UA" "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=ar&q=Hello%20world" | head -c 300; echo
+          echo "== 365 allscores"
+          curl -s -A "$UA" "https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=27&timezoneName=Europe/Berlin&userCountryId=80&sports=1&startDate=28/11/2026&endDate=28/11/2026&showOdds=false" > all.json; wc -c all.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('all.json'))
+          print('keys',list(d.keys())[:20])
+          g=d.get('games',[])
+          print('games',len(g))
+          if g:
+              x=g[0]; print('game keys',sorted(x.keys()))
+              print(json.dumps({k:x[k] for k in x if k in ('id','competitionId','competitionDisplayName','homeCompetitor','awayCompetitor','tvNetworks','statusText','startTime')},ensure_ascii=False)[:1500])
+              tv=[y for y in g if y.get('tvNetworks')]
+              print('with tv',len(tv))
+              if tv: print(json.dumps(tv[0]['tvNetworks'],ensure_ascii=False)[:800]); print(tv[0]['homeCompetitor']['name'],tv[0]['awayCompetitor']['name'],tv[0].get('competitionDisplayName'))
+          c=d.get('competitions',[])
+          print('competitions sample',[ (y.get('id'),y.get('name')) for y in c[:40]])
+          PY
+          echo "== game detail"
+          GID=$(python3 -c "import json;g=json.load(open('all.json')).get('games',[]);print(g[0]['id'] if g else '')")
+          curl -s -A "$UA" "https://webws.365scores.com/web/game/?appTypeId=5&langId=27&timezoneName=Europe/Berlin&userCountryId=80&gameId=$GID" > g.json; wc -c g.json
+          python3 -c "import json;d=json.load(open('g.json'));g=d.get('game',{});print(sorted(g.keys()));print(json.dumps(g.get('tvNetworks'),ensure_ascii=False)[:800])"
