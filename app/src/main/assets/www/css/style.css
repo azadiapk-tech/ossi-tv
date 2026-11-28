@@ -693,3 +693,4 @@ html.pip #pDim{display:none}
 #mtAlert{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);min-width:700px;padding:26px 46px;border-radius:28px;background:rgba(8,10,40,.94);border:2px solid #22d3ee;box-shadow:0 20px 60px rgba(0,0,0,.6);text-align:center;font-size:30px;font-weight:700;z-index:90;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
 #mtAlert.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
 #mtAlert span{display:inline-block;margin:0 26px;font-size:46px;font-weight:900;color:#22d3ee}
+.mt-tabs{justify-content:center}

@@ -16,7 +16,7 @@ var LEAGUES = [
   { id: 'nat', n: 'lgNat', f: '🌍', src: ['fifa.world', 'fifa.worldq.uefa', 'fifa.worldq.afc', 'fifa.worldq.caf', 'uefa.nations', 'uefa.euro', 'fifa.friendly', 'caf.nations', 'afc.asian.cup'] }
 ];
 var TABS = ['live', 'fin', 'up'];
-var S = { lg: 0, tab: 0, area: 'list', li: 0, ev: [], loading: false, err: false, tok: 0, ts: 0 };
+var S = { lg: 0, tab: 0, area: 'lg', li: 0, ev: [], loading: false, err: false, tok: 0, ts: 0 };
 var root = null, built = false, shown = false, timer = 0;
 var MA = O.matches = {};
 
@@ -64,7 +64,6 @@ function load(quiet) {
     if (!got.length && fails === codes.length) { S.err = true; draw(); return; }
     got.sort(function (x, y) { return x.t - y.t; });
     var keep = S.ev.length; S.ev = got;
-    if (!keep) { var c = counts(); S.tab = c.live ? 0 : c.up ? 2 : 1; }
     draw(); schedule();
   }
 }
@@ -248,6 +247,7 @@ function build() {
 MA.show = function () {
   if (!built) build();
   shown = true; root.classList.remove('hidden');
+  S.area = 'lg'; S.tab = 0; S.li = 0;          /* opens on the leagues, showing the live games */
   O.app.setParent('live', null);
   draw();
   if (!S.ev.length || Date.now() - S.ts > 60000) load(!!S.ev.length); else schedule();
@@ -265,11 +265,13 @@ MA.onKey = function (e, k) {
   if (k === K.BACK || k === K.ESC) { O.app.go('home'); e.preventDefault(); return true; }
   if (S.area === 'lg') {
     if (k === K.UP) S.lg = Math.max(0, S.lg - 1); else if (k === K.DOWN) S.lg = Math.min(LEAGUES.length - 1, S.lg + 1);
-    else if (k === K.RIGHT || k === K.ENTER) S.area = v.length ? 'list' : 'tabs';
+    else if (k === K.RIGHT) { S.area = 'tabs'; S.tab = TABS.length - 1; S.li = 0; }   /* → the left-most tab (upcoming) */
+    else if (k === K.ENTER) S.area = v.length ? 'list' : 'tabs';
     else used = false;
     S.li = k === K.UP || k === K.DOWN ? 0 : S.li;
   } else if (S.area === 'tabs') {
-    if (k === K.RIGHT) S.tab = Math.max(0, S.tab - 1); else if (k === K.LEFT) S.tab = Math.min(TABS.length - 1, S.tab + 1);
+    if (k === K.RIGHT) S.tab = Math.max(0, S.tab - 1);
+    else if (k === K.LEFT) { if (S.tab < TABS.length - 1) S.tab++; else S.area = 'lg'; }
     else if (k === K.DOWN || k === K.ENTER) { if (v.length) S.area = 'list'; }
     else used = false;
     if (k === K.LEFT || k === K.RIGHT) S.li = 0;
