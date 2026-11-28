@@ -4,45 +4,9 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - run: |
-          D2=$(TZ=Europe/Berlin date +%d/%m/%Y)
-          Q="appTypeId=5&langId=1&userCountryId=131&timezoneName=Europe%2FBerlin"
-          W='OssiTV/1.4 (Windows; Electron)'
-          show() { python3 -c "
-          import json,sys;s=open('x.json').read()
-          try:
-            d=json.loads(s);g=d.get('games',[]);print('EP',sys.argv[1],'size',len(s),'games',len(g),'keys',list(d.keys())[:8],'lu',d.get('lastUpdateId'))
-            for x in g[:40]:
-              if x['competitionId'] in (78,7,25): print('  ',x['id'],x['competitionId'],x['startTime'][5:16],x['homeCompetitor']['name'],x['homeCompetitor'].get('score'),'-',x['awayCompetitor'].get('score'),x['awayCompetitor']['name'],x.get('statusGroup'),x.get('statusText'),x.get('gameTimeDisplay'))
-          except Exception as e: print('EP',sys.argv[1],'ERR',s[:150])" "$1"; }
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/current/?$Q&competitions=78" > x.json; show current78
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/current/?$Q&competitions=7,25,78" > x.json; show current_7_25_78
-          IDS="4763733,4763740"
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/?$Q&games=$IDS" > x.json; show games_param
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/allscores/?$Q&sports=1&games=$IDS" > x.json; show allscores_games
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/allscores/?$Q&sports=1&startDate=$D2&endDate=$D2&showOdds=false" > full.json
-          LU=$(python3 -c "import json;print(json.load(open('full.json'))['lastUpdateId'])"); echo "LU $LU"; sleep 30
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/allscores/?$Q&sports=1&startDate=$D2&endDate=$D2&showOdds=false&lastUpdateId=$LU" > x.json; show delta
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/games/?$Q&sports=1&lastUpdateId=$LU" > x.json; show delta2
-          echo "== events types"
-          curl -s -A "Mozilla/5.0" "https://webws.365scores.com/web/game/?appTypeId=5&langId=27&userCountryId=131&timezoneName=Europe%2FBerlin&gameId=4763733" > g.json
-          python3 -c "
-          import json;g=json.load(open('g.json'))['game']
-          print('HOME',g['homeCompetitor']['id'],g['homeCompetitor']['name'],'AWAY',g['awayCompetitor']['id'])
-          mem={m['id']:m for m in g.get('members',[])}
-          for e in g.get('events',[]): print('EV',e['eventType'],e.get('competitorId'),e.get('gameTimeDisplay'),mem.get(e.get('playerId'),{}).get('name'))
-          "
-          echo "== UA tests"
-          for u in "https://webws.365scores.com/web/games/current/?$Q&competitions=78" "https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/scoreboard" "https://www.beinsports.com.tr/yayin-akisi/beinsports-2" "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=ar&q=Hi"; do curl -s -o /dev/null -w "UA %{http_code} %{size_download} $u\n" -A "$W" "$u" | cut -c1-120; done
-          echo "== beIN TR channels"
-          for c in beinsports beinsports-2 beinsports-3 beinsports-4 bein-sports-haber beinsports-2/pazar; do
-            curl -s -A "Mozilla/5.0" "https://www.beinsports.com.tr/yayin-akisi/$c" > b.html
-            python3 -c "
-          import re,json,sys
-          s=open('b.html').read();d=json.loads(re.search(r'<script id=\"__NEXT_DATA__\"[^>]*>(.*?)</script>',s,re.S).group(1))
-          pp=d['props']['pageProps'];L=pp['data']['listTvGuides']
-          print('CH',sys.argv[1],len(s),pp.get('selectedRewriteId'),pp.get('selectedDay'),pp['data'].get('event_date'),sorted(set(x['channel_id'] for x in L)))
-          for x in L:
-            if ' - ' in x['name']: print('   ',x['event_time'][:5],x['name'])
-          " "$c"
-          done
+          mkdir out; D=$(TZ=Europe/Berlin date +%Y%m%d)
+          for c in esp.1 eng.1 ger.1 ita.1 fra.1 tur.1; do curl -s "https://site.api.espn.com/apis/site/v2/sports/soccer/$c/scoreboard?dates=$D&lang=ar&region=sa" > out/espn_$c.json; done
+          for c in beinsports beinsports-2 beinsports-3 beinsports-4 bein-sports-haber; do curl -s -A "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36" "https://www.beinsports.com.tr/yayin-akisi/$c" > out/$c.html; done
+          node .probe/ttr.js

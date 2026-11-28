@@ -25,6 +25,10 @@ function srcOf(lg) { return lg.src || [lg.id]; }
 function leagueOf(code) { for (var i = 1; i < LEAGUES.length; i++) if (srcOf(LEAGUES[i]).indexOf(code) > -1) return LEAGUES[i]; return LEAGUES[0]; }
 
 /* ---------- data ---------- */
+function offOf(txt) {   /* postponed / cancelled / suspended matches are not "finished" */
+  txt = String(txt || '');
+  return /postpon|cancel|delay/i.test(txt) ? 'post' : /suspend|abandon|interrupt/i.test(txt) ? 'susp' : '';
+}
 function parse(code, d) {
   var out = [];
   ((d && d.events) || []).forEach(function (e) {
@@ -43,44 +47,61 @@ function parse(code, d) {
     var tv = [];
     (c.geoBroadcasts || []).forEach(function (g) { var n = g.media && (g.media.shortName || g.media.name); if (n && tv.indexOf(n) < 0) tv.push(n); });
     (c.broadcasts || []).forEach(function (b) { (b.names || []).forEach(function (n) { if (n && tv.indexOf(n) < 0) tv.push(n); }); });
-    out.push({ tv: tv.slice(0, 4), id: code + ':' + e.id, eid: e.id, code: code, lg: leagueOf(code).id, t: Date.parse(e.date) || 0,
-      state: ty.state === 'in' ? 'live' : ty.state === 'post' ? 'fin' : 'up',
+    out.push({ tvE: tv.slice(0, 4), tv: tv.slice(0, 4), id: code + ':' + e.id, eid: e.id, code: code, lg: leagueOf(code).id, t: Date.parse(e.date) || 0,
+      state: ty.state === 'in' ? 'live' : ty.state === 'post' ? 'fin' : 'up', off: offOf(ty.name + ' ' + (ty.description || '')),
       clock: ty.shortDetail || st.displayClock || '', h: team(h), a: team(a), goals: goals,
       venue: (c.venue && (c.venue.fullName || (c.venue.address && c.venue.address.city))) || '' });
   });
   return out;
+}
+function espnUrl(code) {   /* the last part only stops any cache from giving an old answer */
+  return 'https://site.api.espn.com/apis/site/v2/sports/soccer/' + code + '/scoreboard?dates=' + ymd(new Date()) + '&lang=ar&region=sa&_=' + Math.floor(Date.now() / 20000);
 }
 function load(quiet) {
   var tk = ++S.tok, codes = [], got = [], left;
   LEAGUES.forEach(function (l, i) { if (i) codes = codes.concat(srcOf(l)); });
   left = codes.length; S.err = false;
   if (!quiet) { S.loading = true; draw(); }
-  var day = ymd(new Date()), fails = 0;
+  var fails = 0;
+  schedule();                                   /* the next refresh is planned even if this one fails */
   codes.forEach(function (code) {
-    O.getJSON('https://site.api.espn.com/apis/site/v2/sports/soccer/' + code + '/scoreboard?dates=' + day + '&lang=ar&region=sa',
+    O.getJSON(espnUrl(code),
       function (d) { if (tk !== S.tok) return; got = got.concat(parse(code, d)); done(); },
-      function () { if (tk !== S.tok) return; fails++; done(); }, 1);
+      function () { if (tk !== S.tok) return; fails++; done(); }, 1, 20000);
   });
   function done() {
     if (--left > 0) return;
-    S.loading = false; S.ts = Date.now();
-    if (!got.length && fails === codes.length) { S.err = true; draw(); return; }
+    S.loading = false;
+    if (!got.length && fails === codes.length) { if (!S.ev.length) S.err = true; draw(); return; }
+    S.ts = Date.now();
     got.sort(function (x, y) { return x.t - y.t; });
-    S.ev = got; tvApply();
-    draw(); schedule(); tv365();
+    S.ev = got;
+    refresh();                                  /* the last known 365Scores state right away (no flicker) */
+    sync365(); btrLoad();
+    if (DET && DET.e.state !== 'up') det365(DET.e);
   }
 }
-/* ---------- which channels show the match: from 365Scores (Arabic channel names) ----------
-   The day's list gives the games; the channels are only in each game's own page, so those are
-   fetched one by one (and kept: they do not change). */
-var T365 = { ts: 0, games: [], busy: false }, TVC = {}, MAP = {}, PEND = {}, tvDrawT = 0;
-var Q365 = 'appTypeId=5&userCountryId=131&timezoneName=';   /* list in English (to match ESPN's names), channels in Arabic */
+function refresh() {
+  apply365(); trMatch(); tvApply();
+  if (DET) { var ne = S.ev.filter(function (x) { return x.id === DET.e.id; })[0]; if (ne) DET.e = ne; }
+  if (shown) { draw(); if (DET) drawDet(); }
+}
+var refT = 0;
+function refreshSoon() { clearTimeout(refT); refT = setTimeout(refresh, 250); }
+
+/* ---------- 365Scores: the live state (more up to date than ESPN, e.g. for the Turkish league)
+   and the channels (Arabic names). The day's list is used once to find each game; after that only
+   the games still running are asked for, every minute (a few KB). ---------- */
+var R365 = 'https://webws.365scores.com/web/';
+var T365 = { ts: 0, day: '', busy: false, failAt: 0 }, GI = {}, MAP = {}, TVC = {}, PEND = {}, GOALS = {};
 var CMP = { 'esp.1': 11, 'eng.1': 7, 'ger.1': 25, 'ita.1': 17, 'fra.1': 35, 'tur.1': 78 };
 function tz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin'; } catch (e) { return 'Europe/Berlin'; } }
+/* lang 1 = English (to compare with ESPN's names), 27 = Arabic (channels, scorers); the region decides the channels */
+function q365(lang) { return 'appTypeId=5&langId=' + lang + '&userCountryId=131&timezoneName=' + encodeURIComponent(tz()); }
 function norm(n) {
-  var x = String(n || ''); try { x = x.normalize('NFD').replace(/[\u0300-\u036f\u064b-\u065f]/g, ''); } catch (e) {}
-  return x.toLowerCase().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/(^|\s)ال/g, '$1')
-    .replace(/\b(fc|cf|ac|sc|afc|ssc|as|club|de|ال)\b/g, '').replace(/[^\w\u0600-\u06ff]/g, '');
+  var x = String(n || ''); try { x = x.normalize('NFD').replace(/[̀-ًͯ-ٟ]/g, ''); } catch (e) {}
+  return x.toLowerCase().replace(/ı/g, 'i').replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/(^|\s)ال/g, '$1')
+    .replace(/\b(fc|cf|ac|sc|afc|ssc|as|club|de)\b/g, '').replace(/[^\w؀-ۿ]/g, '');
 }
 function sim(a, b) {
   a = norm(a); b = norm(b); if (!a || !b) return 0;
@@ -96,64 +117,183 @@ function tside(tm, c) {
   return s;
 }
 function match365(e) {
-  var best = null, bs = 0, cid = CMP[e.code];
-  T365.games.forEach(function (g) {
+  var best = null, bs = 0, sw = false, cid = CMP[e.code];
+  Object.keys(GI).forEach(function (k) {
+    var g = GI[k];
     if (!g.homeCompetitor || !g.awayCompetitor) return;
+    if (cid && g.competitionId !== cid) return;
     var gt = Date.parse(g.startTime) || 0; if (Math.abs(gt - e.t) > 20 * 60000) return;
-    var sc = tside(e.h, g.homeCompetitor) + tside(e.a, g.awayCompetitor);
-    if (cid) { if (g.competitionId !== cid) return; sc += 0.3; }
-    if (sc > bs) { bs = sc; best = g; }
+    var s1 = tside(e.h, g.homeCompetitor) + tside(e.a, g.awayCompetitor), s2 = tside(e.h, g.awayCompetitor) + tside(e.a, g.homeCompetitor);
+    var sc = Math.max(s1, s2) + (cid ? 0.3 : 0);
+    if (sc > bs) { bs = sc; best = g; sw = s2 > s1; }   /* sw: 365 lists the teams the other way round */
   });
-  return bs >= 0.9 ? best : null;
+  return bs >= 0.9 ? { id: best.id, sw: sw, tv: best.hasTVNetworks !== false } : null;
 }
-function tvApply() {
-  S.ev.forEach(function (e) { var g = MAP[e.id]; if (g && TVC[g] && TVC[g].length) e.tv = TVC[g].slice(0, 4); });
+function matchAll() {
+  var changed = false;
+  S.ev.forEach(function (e) {
+    var m = MAP[e.id]; if (m && (m.id || m.none === T365.ts)) return;
+    var r = match365(e); MAP[e.id] = r || { none: T365.ts }; if (r) changed = true;
+  });
+  if (changed) mapSave();
+  return changed;
 }
-function tvRedraw() {
-  clearTimeout(tvDrawT);
-  tvDrawT = setTimeout(function () { tvApply(); if (shown) { draw(); if (DET) drawDet(); } }, 300);
+function mapSave() {
+  var keep = {}; Object.keys(MAP).forEach(function (k) { if (MAP[k].id) keep[k] = MAP[k]; });
+  O.store.gs('m365', { day: ymd(new Date()), map: keep });
 }
-function tv365() {
-  if (T365.busy) return;
-  var now = new Date();
-  if (T365.games.length && Date.now() - T365.ts < 30 * 60000) { tvDetails(); return; }
+(function () { var s = O.store.g('m365', null); if (s && s.day === ymd(new Date()) && s.map) MAP = s.map; })();
+function sides(m, g) { return m.sw ? [g.awayCompetitor || {}, g.homeCompetitor || {}] : [g.homeCompetitor || {}, g.awayCompetitor || {}]; }
+function sc(x) { return x && x.score >= 0 ? String(Math.round(x.score)) : ''; }
+function apply365() {
+  S.ev.forEach(function (e) {
+    var m = MAP[e.id], g = m && m.id && GI[m.id]; if (!g) return;
+    var hs = sides(m, g), sg = g.statusGroup, st = String(g.statusText || '') + ' ' + String(g.shortStatusText || '');
+    if (sg === 3) { e.state = 'live'; e.off = ''; e.clock = /half ?time|\bHT\b/i.test(st) ? 'HT' : (g.gameTimeDisplay || g.shortStatusText || e.clock); }
+    else if (sg === 4) { e.state = 'fin'; e.off = offOf(st); }
+    else return;                                /* not started (or "final result only"): ESPN's view stays */
+    if (sc(hs[0]) !== '' || e.off) { e.h.s = sc(hs[0]); e.a.s = sc(hs[1]); }
+    var gl = GOALS[m.id];
+    if (gl && gl.length >= e.goals.length) e.goals = gl.map(function (x) { return m.sw ? { side: x.side === 'h' ? 'a' : 'h', min: x.min, name: x.name, og: x.og, pen: x.pen } : x; });
+  });
+}
+function sync365() {
+  var today = ymd(new Date());
+  var missing = S.ev.some(function (e) { return !MAP[e.id] || !MAP[e.id].id; });
+  var listOld = T365.day !== today || (missing && Date.now() - T365.ts > 60 * 60000);
+  if (missing && listOld && !T365.busy && Date.now() - T365.failAt > 5 * 60000) { full365(); return; }
+  live365(tvDetails);
+}
+function full365() {
   T365.busy = true;
-  var d = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear();
-  O.httpJSON('https://webws.365scores.com/web/games/allscores/?' + Q365 + encodeURIComponent(tz()) +
-    '&sports=1&startDate=' + d + '&endDate=' + d + '&showOdds=false', function (r) {
-    T365.busy = false; T365.ts = Date.now(); T365.games = (r && r.games) || []; tvDetails();
-  }, function () { T365.busy = false; });
+  var now = new Date(), d = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear(), day = ymd(now);
+  O.httpJSON(R365 + 'games/allscores/?' + q365(1) + '&sports=1&startDate=' + d + '&endDate=' + d + '&showOdds=false', function (r) {
+    T365.busy = false; T365.ts = Date.now(); T365.day = day;
+    ((r && r.games) || []).forEach(function (g) { GI[g.id] = g; });
+    matchAll(); refresh(); tvDetails();
+  }, function () { T365.busy = false; T365.failAt = Date.now(); live365(); });
+}
+/* every minute: only the games that are running, about to start or just ended */
+function live365(cb) {
+  var ids = [], now = Date.now();
+  S.ev.forEach(function (e) {
+    var m = MAP[e.id]; if (!m || !m.id || ids.indexOf(m.id) > -1) return;
+    var g = GI[m.id];
+    if (e.t > now + 15 * 60000) return;
+    if (g && g.statusGroup === 4 && !/just/i.test(g.statusText || '') && e.state === 'fin') return;
+    ids.push(m.id);
+  });
+  if (!ids.length) { if (cb) cb(); return; }
+  O.httpJSON(R365 + 'games/?' + q365(1) + '&games=' + ids.slice(0, 60).join(','), function (r) {
+    ((r && r.games) || []).forEach(function (g) { var old = GI[g.id]; GI[g.id] = g; if (old && !g.homeCompetitor) GI[g.id] = old; });
+    refreshSoon(); if (cb) cb();
+  }, function () { if (cb) cb(); });
 }
 function tvDetails() {
   var todo = [];
   S.ev.forEach(function (e) {
-    if (MAP[e.id] == null) { var g = match365(e); MAP[e.id] = g ? g.id : 0; if (g && !g.hasTVNetworks) TVC[g.id] = TVC[g.id] || []; }
-    var id = MAP[e.id];
-    if (id && !TVC[id] && !PEND[id] && todo.indexOf(id) < 0) todo.push(id);
+    var m = MAP[e.id], id = m && m.id; if (!id) return;
+    if (m.tv === false && !TVC[id]) TVC[id] = [];
+    if (!TVC[id] && !PEND[id] && todo.indexOf(id) < 0) todo.push(id);
   });
-  tvApply();
   var run = 0;
   (function next() {
     while (run < 3 && todo.length) {
-      var id = todo.shift(); run++;
-      PEND[id] = 1;
+      var id = todo.shift(); run++; PEND[id] = 1;
       (function (id) {
-        O.httpJSON('https://webws.365scores.com/web/game/?' + Q365 + encodeURIComponent(tz()) + '&gameId=' + id, function (r) {
-          var n = [];
-          (((r && r.game) || {}).tvNetworks || []).forEach(function (x) { if (x && x.name && n.indexOf(x.name) < 0) n.push(x.name); });
-          delete PEND[id]; TVC[id] = n; run--; if (n.length) tvRedraw(); next();
-        }, function () { delete PEND[id]; run--; next(); });
+        det365get(id, function () { run--; next(); });
       })(id);
     }
   })();
 }
-MA._tv = { sim: sim, match: match365, T: T365, MAP: MAP, TVC: TVC };
+/* one game's own page: channels + goals (Arabic names) */
+function det365get(id, cb) {
+  O.httpJSON(R365 + 'game/?' + q365(27) + '&gameId=' + id, function (r) {
+    delete PEND[id];
+    var g = (r && r.game) || {}, n = [];
+    (g.tvNetworks || []).forEach(function (x) { if (x && x.name && n.indexOf(x.name) < 0) n.push(x.name); });
+    TVC[id] = n; if (n.length) tvcSave();
+    var mem = {}, hid = g.homeCompetitor && g.homeCompetitor.id, gl = [];
+    (g.members || []).forEach(function (x) { mem[x.id] = x.shortName || x.name; });
+    (g.events || []).forEach(function (x) {
+      var ty = x.eventType || {}; if (ty.id !== 1) return;          /* 1 = goal */
+      var sub = String(ty.subTypeName || '');
+      gl.push({ side: x.competitorId === hid ? 'h' : 'a', min: x.gameTimeDisplay || '', name: mem[x.playerId] || '',
+        pen: /جزاء|penalt/i.test(sub), og: /عكس|ذاتي|مرما|own/i.test(sub) });
+    });
+    if (gl.length || (g.statusGroup === 3 || g.statusGroup === 4)) GOALS[id] = gl;
+    refreshSoon(); if (cb) cb();
+  }, function () { delete PEND[id]; if (cb) cb(); });
+}
+function tvcSave() {
+  var keep = {}; Object.keys(TVC).forEach(function (k) { if (TVC[k] && TVC[k].length) keep[k] = TVC[k]; });
+  O.store.gs('tv365', { day: ymd(new Date()), tv: keep });
+}
+(function () { var s = O.store.g('tv365', null); if (s && s.day === ymd(new Date()) && s.tv) Object.keys(s.tv).forEach(function (k) { TVC[k] = s.tv[k]; }); })();
+function det365(e) { var m = MAP[e.id]; if (m && m.id && !PEND[m.id]) { PEND[m.id] = 1; det365get(m.id); } }
+
+/* ---------- Turkish channels: from beIN SPORTS Türkiye's own TV guide (one public page per channel).
+   A match is on a channel when the channel's programme with both team names starts at kick-off. ---------- */
+var BTR_CH = [['beinsports', 'beIN SPORTS 1'], ['beinsports-2', 'beIN SPORTS 2'], ['beinsports-3', 'beIN SPORTS 3'],
+  ['beinsports-4', 'beIN SPORTS 4'], ['bein-sports-haber', 'beIN SPORTS HABER']];
+var BTR = O.store.g('btr', null) || { day: '', ts: 0, list: [] }, btrBusy = false, btrFail = 0, TRM = {};
+function trDay() { var d = new Date(Date.now() + 3 * 3600000); return d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1) + '-' + d.getUTCDate(); }
+function btrLoad() {
+  if (btrBusy || Date.now() - btrFail < 10 * 60000) return;
+  if (BTR.day === trDay() && Date.now() - BTR.ts < 3 * 3600000) return;
+  btrBusy = true;
+  var left = BTR_CH.length, list = [], ok = 0;
+  BTR_CH.forEach(function (c) {
+    O.httpGet('https://www.beinsports.com.tr/yayin-akisi/' + c[0], function (html) {
+      try {
+        var m = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(html);
+        var L = JSON.parse(m[1]).props.pageProps.data.listTvGuides || [];
+        L.forEach(function (x) {
+          if (!/ - /.test(x.name || '')) return;
+          var dm = /(\d+)\/(\d+)\/(\d{4})/.exec(x.event_date || ''), tm = /(\d+):(\d+)/.exec(x.event_time || '');
+          if (dm && tm) list.push([c[1], Date.UTC(+dm[3], +dm[1] - 1, +dm[2], +tm[1] - 3, +tm[2]), x.name]);   /* Turkey = UTC+3 */
+        });
+        ok++;
+      } catch (e) {}
+      fin();
+    }, fin);
+  });
+  function fin() {
+    if (--left > 0) return;
+    btrBusy = false;
+    if (ok) { BTR = { day: trDay(), ts: Date.now(), list: list }; O.store.gs('btr', BTR); } else btrFail = Date.now();
+    refreshSoon();
+  }
+}
+function trMatch() {
+  TRM = {};
+  function s(tm, n) { return Math.max(sim(tm.n, n), sim(tm.full, n)); }
+  S.ev.forEach(function (e) {
+    var out = [];
+    (BTR.list || []).forEach(function (x) {
+      var dt = x[1] - e.t; if (dt < -40 * 60000 || dt > 10 * 60000) return;
+      var p = String(x[2]).split(' - '); if (p.length !== 2) return;
+      var a1 = s(e.h, p[0]), b1 = s(e.a, p[1]), a2 = s(e.h, p[1]), b2 = s(e.a, p[0]);
+      var ok = (a1 + b1 >= 0.9 && Math.max(a1, b1) >= 0.8) || (a2 + b2 >= 0.9 && Math.max(a2, b2) >= 0.8);
+      if (ok && out.indexOf(x[0]) < 0) out.push(x[0]);
+    });
+    if (out.length) TRM[e.id] = out;
+  });
+}
+function tvApply() {
+  S.ev.forEach(function (e) {
+    var m = MAP[e.id], ar = (m && m.id && TVC[m.id]) || [];
+    var out = (ar.length ? ar : (e.tvE || [])).slice();
+    (TRM[e.id] || []).forEach(function (n) { n = '🇹🇷 ' + n; if (out.indexOf(n) < 0) out.push(n); });
+    e.tv = out;
+  });
+}
+MA._tv = { sim: sim, match: match365, GI: GI, MAP: function () { return MAP; }, TVC: TVC, TRM: function () { return TRM; }, BTR: function () { return BTR; } };
 
 function schedule() {
   clearTimeout(timer);
   if (!shown) return;
-  var live = S.ev.some(function (e) { return e.state === 'live'; });
-  timer = setTimeout(function () { if (shown) load(true); }, live ? 60000 : 300000);   /* live: every minute */
+  timer = setTimeout(function () { if (shown) load(true); }, 60000);   /* every minute while the screen is open */
 }
 function counts(lgId) {
   var c = { live: 0, fin: 0, up: 0, all: 0 };
@@ -183,7 +323,11 @@ function alSave() { O.store.gs('malerts', AL); }
 function alOn(e) { return !!AL[e.id]; }
 function alToggle(e) {
   if (AL[e.id]) { delete AL[e.id]; O.toast(t('mAlertOff')); }
-  else { AL[e.id] = { code: e.code, eid: e.eid, h: e.h.n, a: e.a.n, hs: e.h.s, as: e.a.s, t: e.t }; O.toast(t('mAlertOn')); }
+  else {
+    var m = MAP[e.id];
+    AL[e.id] = { code: e.code, eid: e.eid, h: e.h.n, a: e.a.n, hs: e.h.s, as: e.a.s, t: e.t, state: e.state, g: (m && m.id) || 0, sw: !!(m && m.sw) };
+    O.toast(t('mAlertOn'));
+  }
   alSave(); alLoop();
 }
 function banner(txt) {
@@ -192,22 +336,35 @@ function banner(txt) {
   b.innerHTML = txt; b.classList.add('show');
   clearTimeout(bannerT); bannerT = setTimeout(function () { b.classList.remove('show'); }, 3000);
 }
+/* home team on the right, its score next to it (as in the list) */
+function alLine(h, a, hs, as) {
+  return '<div class="ma-l" dir="rtl"><bdi>' + esc(h) + '</bdi><span dir="ltr">' + esc(as) + ' - ' + esc(hs) + '</span><bdi>' + esc(a) + '</bdi></div>';
+}
+function alStep(id, x) {
+  var a = AL[id]; if (!a) return;
+  if (x.state === 'up') { a.state = 'up'; alSave(); return; }
+  var line = alLine(a.h, a.a, x.hs, x.as), now = (+x.hs || 0) + (+x.as || 0), before = (+a.hs || 0) + (+a.as || 0);
+  if (x.state === 'fin') { banner('🏁 ' + esc(t('mEnded')) + line); delete AL[id]; alSave(); return; }
+  if (a.state !== 'live' && now === 0) banner('⚽ ' + esc(t('mKick')) + line);
+  else if (now > before) banner('⚽ ' + esc(t('mGoal')) + ' <bdi dir="ltr">' + esc(x.clock || '') + '</bdi>' + line);
+  a.hs = x.hs; a.as = x.as; a.state = x.state; alSave();
+}
 function alCheck() {
   var watching = O.pui && O.pui.active && O.pui.kind === 'live';
   var ids = Object.keys(AL); if (!ids.length || !watching) return;
-  var codes = {}; ids.forEach(function (id) { codes[AL[id].code] = 1; });
-  var day = ymd(new Date());
+  var by = {}, codes = {};
+  ids.forEach(function (id) { var a = AL[id]; if (a.g) by[a.g] = id; else codes[a.code] = 1; });
+  var gids = Object.keys(by);
+  if (gids.length) O.httpJSON(R365 + 'games/?' + q365(1) + '&games=' + gids.join(','), function (r) {
+    ((r && r.games) || []).forEach(function (g) {
+      var id = by[g.id], a = AL[id]; if (!a) return;
+      var hs = sides(a, g), sg = g.statusGroup;
+      alStep(id, { state: sg === 3 ? 'live' : sg === 4 ? 'fin' : 'up', hs: sc(hs[0]), as: sc(hs[1]), clock: g.gameTimeDisplay || '' });
+    });
+  });
   Object.keys(codes).forEach(function (code) {
-    O.getJSON('https://site.api.espn.com/apis/site/v2/sports/soccer/' + code + '/scoreboard?dates=' + day + '&lang=ar&region=sa', function (d) {
-      parse(code, d).forEach(function (e) {
-        var a = AL[e.id]; if (!a) return;
-        var line = '<b>' + esc(e.h.n) + '</b><span dir="ltr">' + esc(e.h.s) + ' - ' + esc(e.a.s) + '</span><b>' + esc(e.a.n) + '</b>';
-        if (e.state === 'live' && a.state !== 'live' && !a.hs) banner('⚽ ' + esc(t('mKick')) + '<br>' + line);
-        else if (e.h.s !== a.hs || e.a.s !== a.as) banner('⚽ ' + esc(t('mGoal')) + ' ' + esc(e.clock) + '<br>' + line);
-        if (e.state === 'fin') { banner('🏁 ' + esc(t('mEnded')) + '<br>' + line); delete AL[e.id]; }
-        else { a.hs = e.h.s; a.as = e.a.s; a.state = e.state; }
-        alSave();
-      });
+    O.getJSON(espnUrl(code), function (d) {
+      parse(code, d).forEach(function (e) { if (AL[e.id] && !AL[e.id].g) alStep(e.id, { state: e.state, hs: e.h.s, as: e.a.s, clock: e.clock }); });
     }, function () {}, 0);
   });
 }
@@ -225,6 +382,7 @@ var DET = null;
 function openDet(e) {
   DET = { e: e, b: 0 };
   var el = $('mtDet'); el.classList.remove('hidden'); drawDet();
+  if (e.state !== 'up') det365(e);             /* scorers (and channels) fresh from 365Scores */
 }
 function closeDet() { DET = null; var el = $('mtDet'); if (el) { el.classList.add('hidden'); el.innerHTML = ''; } }
 function detBtns() {
@@ -236,7 +394,8 @@ function detBtns() {
 function drawDet() {
   if (!DET) return;
   var e = DET.e, l = leagueOf(e.code), mid;
-  if (e.state === 'up') mid = '<b class="md-time">' + O.fmtHM(e.t) + '</b><span class="mt-up">' + esc(t('mToday')) + '</span>';
+  if (e.off) mid = '<b class="md-time">' + O.fmtHM(e.t) + '</b><span class="mt-fin">' + esc(t(e.off === 'post' ? 'mPostp' : 'mSusp')) + '</span>';
+  else if (e.state === 'up') mid = '<b class="md-time">' + O.fmtHM(e.t) + '</b><span class="mt-up">' + esc(t('mToday')) + '</span>';
   else mid = '<b class="md-sc"><span dir="ltr">' + esc(e.a.s) + ' - ' + esc(e.h.s) + '</span></b>' +
     (e.state === 'live' ? '<span class="mt-live">● ' + esc(t('mLive')) + ' ' + esc(e.clock) + '</span>' : '<span class="mt-fin">' + esc(t('mEnded')) + '</span>');
   function goals(side) {
@@ -268,7 +427,8 @@ function logo(tm) {
 function hm(ms) { return O.fmtHM(ms); }
 function row(e, i) {
   var mid, st;
-  if (e.state === 'up') { mid = '<b class="mt-time">' + hm(e.t) + '</b>'; st = '<span class="mt-up">' + esc(t('mToday')) + '</span>'; }
+  if (e.off) { mid = '<b class="mt-time">' + hm(e.t) + '</b>'; st = '<span class="mt-fin">' + esc(t(e.off === 'post' ? 'mPostp' : 'mSusp')) + '</span>'; }
+  else if (e.state === 'up') { mid = '<b class="mt-time">' + hm(e.t) + '</b>'; st = '<span class="mt-up">' + esc(t('mToday')) + '</span>'; }
   else {
     mid = '<b class="mt-sc"><span dir="ltr">' + esc(e.a.s) + ' - ' + esc(e.h.s) + '</span></b>';
     st = e.state === 'live' ? '<span class="mt-live">● ' + esc(t('mLive')) + ' ' + esc(e.clock) + '</span>' : '<span class="mt-fin">' + esc(t('mEnded')) + '</span>';
@@ -286,6 +446,7 @@ function draw() {
     h += '<div class="cat mt-cat' + (i === S.lg ? ' act' : '') + (S.area === 'lg' && i === S.lg ? ' focus' : '') + '" data-l="' + i + '"><span class="fl">' + l.f + '</span><span class="nm" dir="auto">' + esc(t(l.n)) + '</span><b>' + (S.ev.length ? c.all : '') + '</b></div>';
   });
   $('mtLg').innerHTML = h;
+  $('mtSrc').innerHTML = '<span>' + esc(t('mSrc')) + '</span>' + (S.ts ? '<span class="mt-upd">' + esc(t('mUpdAt')) + ' <b dir="ltr">' + O.fmtHM(S.ts) + '</b></span>' : '');
   var cc = counts(LEAGUES[S.lg].id), lab = { live: '🔴 ' + t('mLiveNow'), fin: '✅ ' + t('mEndedTab'), up: '🕐 ' + t('mUpcoming') };
   $('mtTabs').innerHTML = TABS.map(function (k, i) {
     return '<div class="mt-tab' + (i === S.tab ? ' on' : '') + (S.area === 'tabs' && i === S.tab ? ' focus' : '') + '" data-t="' + i + '">' + esc(lab[k]) + '<i>' + cc[k] + '</i></div>';
@@ -316,7 +477,7 @@ function build() {
     '<div class="hbtn" data-go="home" style="left:1790px;margin-left:var(--X,0px)">' + O.ic.home + '</div>' +
     '<div class="pane lv-cats"></div><div class="lv-list mt-lgs" id="mtLg"></div>' +
     '<div class="mt-tabs" id="mtTabs" dir="ltr"></div><div class="mt-list" id="mtList" dir="rtl"></div>' +
-    '<div class="mt-src">' + esc(t('mSrc')) + '</div><div id="mtDet" class="hidden"></div>';
+    '<div class="mt-src" id="mtSrc" dir="rtl"></div><div id="mtDet" class="hidden"></div>';
   root.addEventListener('click', function (e) {
     var g = e.target.closest('[data-go]'); if (g) { O.app.go(g.getAttribute('data-go')); return; }
     var db = e.target.closest('.md-b'); if (db) { DET.b = +db.getAttribute('data-b'); detAct(DET.b); return; }
@@ -333,7 +494,7 @@ MA.show = function () {
   S.area = 'lg'; S.tab = 0; S.li = 0;          /* opens on the leagues, showing the live games */
   O.app.setParent('live', null);
   draw();
-  if (!S.ev.length || Date.now() - S.ts > 60000) load(!!S.ev.length); else schedule();
+  load(!!S.ev.length);                         /* fresh results on every visit, then every minute */
 };
 MA.hide = function () { shown = false; clearTimeout(timer); closeDet(); if (root) root.classList.add('hidden'); };
 MA.onKey = function (e, k) {
@@ -369,6 +530,8 @@ MA.onKey = function (e, k) {
   return used;
 };
 MA.relang = function () { built = false; };
+MA.resume = function () { if (shown && !document.hidden) load(true); };   /* back in the app: refresh at once */
+document.addEventListener('visibilitychange', function () { if (!document.hidden) MA.resume(); });
 /* phone, Fire TV and the Windows app */
 MA.enabled = function () { return true; };
 })();
