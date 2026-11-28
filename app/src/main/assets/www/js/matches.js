@@ -232,17 +232,48 @@ function tvcSave() {
 (function () { var s = O.store.g('tv365', null); if (s && s.day === ymd(new Date()) && s.tv) Object.keys(s.tv).forEach(function (k) { TVC[k] = s.tv[k]; }); })();
 function det365(e) { var m = MAP[e.id]; if (m && m.id && !PEND[m.id]) { PEND[m.id] = 1; det365get(m.id); } }
 
-/* ---------- Turkish channels: from beIN SPORTS Türkiye's own TV guide (one public page per channel).
-   A match is on a channel when the channel's programme with both team names starts at kick-off. ---------- */
+/* ---------- Turkish channels ----------
+   1) beIN SPORTS Türkiye's own TV guide (one public page per channel: beIN SPORTS 1-4, HABER)
+   2) Sporx "TV'de bugün – futbol": every Turkish channel in one list (S Sport, TRT Spor, beIN MAX, A Spor …),
+      only the rows marked live ("Canlı").
+   A match is on a channel when that channel's programme with the team names starts at kick-off. */
 var BTR_CH = [['beinsports', 'beIN SPORTS 1'], ['beinsports-2', 'beIN SPORTS 2'], ['beinsports-3', 'beIN SPORTS 3'],
   ['beinsports-4', 'beIN SPORTS 4'], ['bein-sports-haber', 'beIN SPORTS HABER']];
-var BTR = O.store.g('btr', null) || { day: '', ts: 0, list: [] }, btrBusy = false, btrFail = 0, TRM = {};
-function trDay() { var d = new Date(Date.now() + 3 * 3600000); return d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1) + '-' + d.getUTCDate(); }
+var BTR = O.store.g('btr2', null) || { day: '', ts: 0, list: [] }, btrBusy = false, btrFail = 0, TRM = {};
+function trNow() { return new Date(Date.now() + 3 * 3600000); }          /* Turkey = UTC+3 all year */
+function trDay() { var d = trNow(); return d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1) + '-' + d.getUTCDate(); }
+/* one spelling per channel, whichever site it comes from */
+function chName(n) {
+  n = String(n || '').replace(/\s+/g, ' ').trim(); var m;
+  if ((m = /^bein\s*sports?\s*(\d)/i.exec(n))) return 'beIN SPORTS ' + m[1];
+  if ((m = /^bein\s*(?:sports?\s*)?max\s*(\d)/i.exec(n))) return 'beIN SPORTS MAX ' + m[1];
+  if (/^bein\s*(?:sports?\s*)?haber/i.test(n)) return 'beIN SPORTS HABER';
+  return n;
+}
+function untag(x) {
+  return String(x || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function sxParse(html) {
+  var d = trNow(), y = d.getUTCFullYear(), mo = d.getUTCMonth(), da = d.getUTCDate(), out = [], prevH = -1, add = 0;
+  String(html || '').split(/<tr[\s>]/i).forEach(function (row) {
+    var tm = /class="ch-time"[^>]*>\s*(\d{1,2}):(\d{2})/.exec(row); if (!tm) return;
+    var hh = +tm[1];
+    if (prevH > -1 && hh < prevH - 6) add = 1;       /* the list runs past midnight */
+    prevH = hh;
+    var ch = /class="ch-name"[^>]*>([^<]+)/.exec(row), tx = /class="ch-text"[^>]*>([\s\S]*?)<\/span>/.exec(row);
+    if (!ch || !tx || !/<span class="ch-type">\s*Canl/i.test(row)) return;
+    var text = untag(tx[1]); if (!/\(Futbol\)/i.test(text)) return;
+    text = text.replace(/\([^)]*\)/g, '').trim();
+    if (/ - /.test(text)) out.push([chName(untag(ch[1])), Date.UTC(y, mo, da + add, hh - 3, +tm[2]), text]);
+  });
+  return out;
+}
 function btrLoad() {
   if (btrBusy || Date.now() - btrFail < 10 * 60000) return;
-  if (BTR.day === trDay() && Date.now() - BTR.ts < 3 * 3600000) return;
+  if (BTR.day === trDay() && Date.now() - BTR.ts < 2 * 3600000) return;
   btrBusy = true;
-  var left = BTR_CH.length, list = [], ok = 0;
+  var left = BTR_CH.length + 1, list = [], ok = 0;
   BTR_CH.forEach(function (c) {
     O.httpGet('https://www.beinsports.com.tr/yayin-akisi/' + c[0], function (html) {
       try {
@@ -251,17 +282,22 @@ function btrLoad() {
         L.forEach(function (x) {
           if (!/ - /.test(x.name || '')) return;
           var dm = /(\d+)\/(\d+)\/(\d{4})/.exec(x.event_date || ''), tm = /(\d+):(\d+)/.exec(x.event_time || '');
-          if (dm && tm) list.push([c[1], Date.UTC(+dm[3], +dm[1] - 1, +dm[2], +tm[1] - 3, +tm[2]), x.name]);   /* Turkey = UTC+3 */
+          if (dm && tm) list.push([c[1], Date.UTC(+dm[3], +dm[1] - 1, +dm[2], +tm[1] - 3, +tm[2]), x.name]);
         });
         ok++;
       } catch (e) {}
       fin();
     }, fin);
   });
+  O.httpGet('https://www.sporx.com/tvde-bugun-futbol', function (html) {
+    var L = []; try { L = sxParse(html); } catch (e) {}
+    if (L.length) { list = list.concat(L); ok++; }
+    fin();
+  }, fin);
   function fin() {
     if (--left > 0) return;
     btrBusy = false;
-    if (ok) { BTR = { day: trDay(), ts: Date.now(), list: list }; O.store.gs('btr', BTR); } else btrFail = Date.now();
+    if (ok) { BTR = { day: trDay(), ts: Date.now(), list: list }; O.store.gs('btr2', BTR); } else btrFail = Date.now();
     refreshSoon();
   }
 }
@@ -275,7 +311,8 @@ function trMatch() {
       var p = String(x[2]).split(' - '); if (p.length !== 2) return;
       var a1 = s(e.h, p[0]), b1 = s(e.a, p[1]), a2 = s(e.h, p[1]), b2 = s(e.a, p[0]);
       var ok = (a1 + b1 >= 0.9 && Math.max(a1, b1) >= 0.8) || (a2 + b2 >= 0.9 && Math.max(a2, b2) >= 0.8);
-      if (ok && out.indexOf(x[0]) < 0) out.push(x[0]);
+      var c = chName(x[0]);
+      if (ok && out.indexOf(c) < 0) out.push(c);
     });
     if (out.length) TRM[e.id] = out;
   });
@@ -288,7 +325,7 @@ function tvApply() {
     e.tv = out;
   });
 }
-MA._tv = { sim: sim, match: match365, GI: GI, MAP: function () { return MAP; }, TVC: TVC, TRM: function () { return TRM; }, BTR: function () { return BTR; } };
+MA._tv = { sxParse: sxParse, chName: chName, sim: sim, match: match365, GI: GI, MAP: function () { return MAP; }, TVC: TVC, TRM: function () { return TRM; }, BTR: function () { return BTR; } };
 
 function schedule() {
   clearTimeout(timer);
