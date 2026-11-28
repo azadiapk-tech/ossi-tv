@@ -673,3 +673,23 @@ html.pip #pDim{display:none}
 .mt-live{color:#ff4d6d;font-weight:800}.mt-fin{color:#9fb0d4}.mt-up{color:#22d3ee}
 .mt-ch{background:rgba(0,0,0,.25);border-radius:12px;padding:1px 12px}.mt-ch.off{color:#9fb0d4}
 .mt-src{position:absolute;right:40px;bottom:10px;font-size:16px;color:#6c76a8}
+/* matches: match window + score banner */
+#mtDet{position:absolute;left:0;top:0;width:var(--W,1920px);height:1080px;background:rgba(2,3,16,.6);z-index:45}
+.md-box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:1240px;border-radius:32px;background:linear-gradient(170deg,#11134a,#0a0b2c);border:1px solid rgba(255,255,255,.18);box-shadow:0 30px 80px rgba(0,0,0,.6);padding:34px 44px 34px}
+.md-lg{text-align:center;font-size:26px;color:#9fb0d4;font-weight:700}
+.md-teams{display:flex;align-items:flex-start;margin-top:26px}
+.md-t{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
+.md-t .mt-lg{width:120px;height:120px}.md-t .mt-lg img{left:8px;top:8px;width:104px;height:104px}.md-t .mt-lg i{font-size:34px}
+.md-t b{font-size:32px}
+.md-g{font-size:21px;color:#c9d6f0;line-height:1.5}.md-g i{font-style:normal;color:#9fb0d4}
+.md-mid{flex:none;width:300px;display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:24px}
+.md-sc{font-size:76px;font-weight:900}.md-time{font-size:60px;font-weight:800;color:#22d3ee}
+.md-mid .mt-live,.md-mid .mt-fin,.md-mid .mt-up{font-size:26px}
+.md-info{text-align:center;margin-top:24px;font-size:22px;color:#9fb0d4}
+.md-btns{display:flex;justify-content:center;gap:22px;margin-top:28px}
+.md-b{min-width:220px;padding:0 28px;height:72px;line-height:72px;text-align:center;border-radius:36px;background:rgba(255,255,255,.08);font-size:26px;border:2px solid transparent}
+.md-b.focus{background:linear-gradient(135deg,#0e6f86,#5b2a8e);border-color:#fff}
+.mt-bell{font-size:20px}
+#mtAlert{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);min-width:700px;padding:26px 46px;border-radius:28px;background:rgba(8,10,40,.94);border:2px solid #22d3ee;box-shadow:0 20px 60px rgba(0,0,0,.6);text-align:center;font-size:30px;font-weight:700;z-index:90;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+#mtAlert.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#mtAlert span{display:inline-block;margin:0 26px;font-size:46px;font-weight:900;color:#22d3ee}

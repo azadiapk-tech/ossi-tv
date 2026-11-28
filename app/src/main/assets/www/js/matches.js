@@ -33,9 +33,17 @@ function parse(code, d) {
     (c.competitors || []).forEach(function (x) { if (x.homeAway === 'home') h = x; else a = x; });
     if (!h || !a) return;
     function team(x) { var tm = x.team || {}; return { n: tm.shortDisplayName || tm.displayName || tm.name || '?', logo: tm.logo || (tm.logos && tm.logos[0] && tm.logos[0].href) || '', s: x.score != null ? String(x.score) : '' }; }
-    out.push({ id: code + ':' + e.id, code: code, lg: leagueOf(code).id, t: Date.parse(e.date) || 0,
+    var hid = h.team && h.team.id, goals = [];
+    (c.details || []).forEach(function (g) {
+      if (!g.scoringPlay) return;
+      var who = (g.athletesInvolved || [])[0] || {}, tp = (g.type && g.type.text) || '';
+      goals.push({ side: g.team && String(g.team.id) === String(hid) ? 'h' : 'a', min: (g.clock && g.clock.displayValue) || '',
+        name: who.shortName || who.displayName || '', og: /own/i.test(tp), pen: /pen/i.test(tp) });
+    });
+    out.push({ id: code + ':' + e.id, eid: e.id, code: code, lg: leagueOf(code).id, t: Date.parse(e.date) || 0,
       state: ty.state === 'in' ? 'live' : ty.state === 'post' ? 'fin' : 'up',
-      clock: ty.shortDetail || st.displayClock || '', h: team(h), a: team(a) });
+      clock: ty.shortDetail || st.displayClock || '', h: team(h), a: team(a), goals: goals,
+      venue: (c.venue && (c.venue.fullName || (c.venue.address && c.venue.address.city))) || '' });
   });
   return out;
 }
@@ -76,28 +84,98 @@ function view() {
   return S.ev.filter(function (e) { return e.state === tab && (lg === 'all' || e.lg === lg); });
 }
 
-/* ---------- channel linked to a league ---------- */
-function chanOf(lgId) { return O.store.p('mchan.' + lgId, null); }
-function linkChannel(e) {
-  var lg = leagueOf(e.code);
-  O.app.setParent('live', 'matches');
-  O.app.go('live', { pick: function (c) {
-    O.store.ps('mchan.' + lg.id, { id: c.id, name: c.name, icon: c.icon, cat: c.cat });
-    O.toast(t('mLinked') + ' ' + c.name);
-    O.app.go('matches');
-  } });
-}
+/* ---------- watching: pick one of the sport packages, the TV section opens on it ---------- */
 function watch(e) {
-  var ch = chanOf(e.lg);
-  if (!ch) { linkChannel(e); return; }
-  O.live.playFrom(ch, 'matches');
+  O.live.sportCats(function (cats) {
+    if (!cats.length) { O.toast(t('mNoSport')); O.app.setParent('live', 'matches'); O.app.go('live'); return; }
+    M.list(t('mPickPkg'), function () {
+      return cats.map(function (c) { return { label: c.name, onOk: function () {
+        M.closeAll(); closeDet(); O.app.setParent('live', 'matches'); O.app.go('live', { cat: c.id });
+      } }; });
+    }, { light: true });
+  });
 }
-function rowMenu(e) {
-  var ch = chanOf(e.lg), lg = leagueOf(e.code), rows = [];
-  if (ch) rows.push({ label: '▶  ' + t('mWatch') + ': ' + ch.name, onOk: function () { M.close(); watch(e); } });
-  rows.push({ label: '📺  ' + (ch ? t('mRelink') : t('mLink')) + ' (' + t(lg.n) + ')', onOk: function () { M.close(); linkChannel(e); } });
-  if (ch) rows.push({ label: '✖  ' + t('mUnlink'), onOk: function () { M.close(); O.store.ps('mchan.' + lg.id, null); draw(); } });
-  M.list(e.h.n + ' – ' + e.a.n, function () { return rows; }, { light: true });
+
+/* ---------- score alerts (only shown while a TV channel is playing) ---------- */
+var AL = O.store.g('malerts', {}), alT = 0, bannerT = 0;
+function alSave() { O.store.gs('malerts', AL); }
+function alOn(e) { return !!AL[e.id]; }
+function alToggle(e) {
+  if (AL[e.id]) { delete AL[e.id]; O.toast(t('mAlertOff')); }
+  else { AL[e.id] = { code: e.code, eid: e.eid, h: e.h.n, a: e.a.n, hs: e.h.s, as: e.a.s, t: e.t }; O.toast(t('mAlertOn')); }
+  alSave(); alLoop();
+}
+function banner(txt) {
+  var b = $('mtAlert');
+  if (!b) { b = document.createElement('div'); b.id = 'mtAlert'; $('stage').appendChild(b); }
+  b.innerHTML = txt; b.classList.add('show');
+  clearTimeout(bannerT); bannerT = setTimeout(function () { b.classList.remove('show'); }, 3000);
+}
+function alCheck() {
+  var watching = O.pui && O.pui.active && O.pui.kind === 'live';
+  var ids = Object.keys(AL); if (!ids.length || !watching) return;
+  var codes = {}; ids.forEach(function (id) { codes[AL[id].code] = 1; });
+  var day = ymd(new Date());
+  Object.keys(codes).forEach(function (code) {
+    O.getJSON('https://site.api.espn.com/apis/site/v2/sports/soccer/' + code + '/scoreboard?dates=' + day + '&lang=ar&region=sa', function (d) {
+      parse(code, d).forEach(function (e) {
+        var a = AL[e.id]; if (!a) return;
+        var line = '<b>' + esc(e.h.n) + '</b><span dir="ltr">' + esc(e.h.s) + ' - ' + esc(e.a.s) + '</span><b>' + esc(e.a.n) + '</b>';
+        if (e.state === 'live' && a.state !== 'live' && !a.hs) banner('⚽ ' + esc(t('mKick')) + '<br>' + line);
+        else if (e.h.s !== a.hs || e.a.s !== a.as) banner('⚽ ' + esc(t('mGoal')) + ' ' + esc(e.clock) + '<br>' + line);
+        if (e.state === 'fin') { banner('🏁 ' + esc(t('mEnded')) + '<br>' + line); delete AL[e.id]; }
+        else { a.hs = e.h.s; a.as = e.a.s; a.state = e.state; }
+        alSave();
+      });
+    }, function () {}, 0);
+  });
+}
+function alLoop() {
+  clearInterval(alT);
+  /* old subscriptions (more than 6 hours past kick-off) are dropped */
+  Object.keys(AL).forEach(function (id) { if (Date.now() - (AL[id].t || 0) > 6 * 3600000) delete AL[id]; });
+  if (Object.keys(AL).length) alT = setInterval(alCheck, 60000);
+}
+alLoop();
+MA._alCheck = alCheck;
+
+/* ---------- match window ---------- */
+var DET = null;
+function openDet(e) {
+  DET = { e: e, b: 0 };
+  var el = $('mtDet'); el.classList.remove('hidden'); drawDet();
+}
+function closeDet() { DET = null; var el = $('mtDet'); if (el) { el.classList.add('hidden'); el.innerHTML = ''; } }
+function detBtns() {
+  var e = DET.e, b = [{ id: 'watch', l: '📺 ' + t('mWatch') }];
+  if (e.state !== 'fin') b.push({ id: 'alert', l: (alOn(e) ? '🔕 ' + t('mAlertStop') : '🔔 ' + t('mAlertStart')) });
+  b.push({ id: 'close', l: t('close') });
+  return b;
+}
+function drawDet() {
+  if (!DET) return;
+  var e = DET.e, l = leagueOf(e.code), mid;
+  if (e.state === 'up') mid = '<b class="md-time">' + O.fmtHM(e.t) + '</b><span class="mt-up">' + esc(t('mToday')) + '</span>';
+  else mid = '<b class="md-sc"><span dir="ltr">' + esc(e.a.s) + ' - ' + esc(e.h.s) + '</span></b>' +
+    (e.state === 'live' ? '<span class="mt-live">● ' + esc(t('mLive')) + ' ' + esc(e.clock) + '</span>' : '<span class="mt-fin">' + esc(t('mEnded')) + '</span>');
+  function goals(side) {
+    return e.goals.filter(function (g) { return g.side === side; }).map(function (g) {
+      return '<div>⚽ ' + esc(g.name) + ' <i>' + esc(g.min) + (g.pen ? ' (P)' : '') + (g.og ? ' (OG)' : '') + '</i></div>';
+    }).join('');
+  }
+  var h = '<div class="md-box" dir="rtl"><div class="md-lg">' + l.f + ' ' + esc(t(l.n)) + '</div>' +
+    '<div class="md-teams"><div class="md-t">' + logo(e.h) + '<b dir="auto">' + esc(e.h.n) + '</b><div class="md-g">' + goals('h') + '</div></div>' +
+    '<div class="md-mid">' + mid + '</div>' +
+    '<div class="md-t">' + logo(e.a) + '<b dir="auto">' + esc(e.a.n) + '</b><div class="md-g">' + goals('a') + '</div></div></div>' +
+    '<div class="md-info">🕐 ' + O.fmtHM(e.t) + (e.venue ? '   •   🏟 ' + esc(e.venue) : '') + '</div><div class="md-btns">';
+  detBtns().forEach(function (x, i) { h += '<b class="md-b' + (i === DET.b ? ' focus' : '') + '" data-b="' + i + '">' + esc(x.l) + '</b>'; });
+  $('mtDet').innerHTML = h + '</div></div>';
+}
+function detAct(i) {
+  var x = detBtns()[i]; if (!x) return;
+  if (x.id === 'watch') watch(DET.e);
+  else if (x.id === 'alert') { alToggle(DET.e); drawDet(); draw(); }
+  else closeDet();
 }
 
 /* ---------- drawing ---------- */
@@ -107,7 +185,7 @@ function logo(tm) {
 }
 function hm(ms) { return O.fmtHM(ms); }
 function row(e, i) {
-  var ch = chanOf(e.lg), mid, st;
+  var mid, st;
   if (e.state === 'up') { mid = '<b class="mt-time">' + hm(e.t) + '</b>'; st = '<span class="mt-up">' + esc(t('mToday')) + '</span>'; }
   else {
     mid = '<b class="mt-sc"><span dir="ltr">' + esc(e.a.s) + ' - ' + esc(e.h.s) + '</span></b>';
@@ -116,7 +194,7 @@ function row(e, i) {
   return '<div class="mt-row' + (S.area === 'list' && i === S.li ? ' focus' : '') + '" data-i="' + i + '">' +
     '<div class="mt-t mt-h"><span class="mt-n" dir="auto">' + esc(e.h.n) + '</span>' + logo(e.h) + '</div>' + mid +
     '<div class="mt-t mt-a">' + logo(e.a) + '<span class="mt-n" dir="auto">' + esc(e.a.n) + '</span></div>' +
-    '<div class="mt-meta">' + st + '<span class="mt-ch' + (ch ? '' : ' off') + '" data-ch="' + i + '">' + (ch ? '📺 ' + esc(ch.name) : '＋ ' + esc(t('mLink'))) + '</span></div></div>';
+    '<div class="mt-meta">' + st + (alOn(e) ? '<span class="mt-bell">🔔</span>' : '') + '</div></div>';
 }
 function draw() {
   if (!built) return;
@@ -156,13 +234,14 @@ function build() {
     '<div class="hbtn" data-go="home" style="left:1790px;margin-left:var(--X,0px)">' + O.ic.home + '</div>' +
     '<div class="pane lv-cats"></div><div class="lv-list mt-lgs" id="mtLg"></div>' +
     '<div class="mt-tabs" id="mtTabs" dir="rtl"></div><div class="mt-list" id="mtList" dir="rtl"></div>' +
-    '<div class="mt-src">' + esc(t('mSrc')) + '</div>';
+    '<div class="mt-src">' + esc(t('mSrc')) + '</div><div id="mtDet" class="hidden"></div>';
   root.addEventListener('click', function (e) {
     var g = e.target.closest('[data-go]'); if (g) { O.app.go(g.getAttribute('data-go')); return; }
-    var c = e.target.closest('[data-ch]'); if (c) { var ev = S.view[+c.getAttribute('data-ch')]; if (ev) rowMenu(ev); return; }
+    var db = e.target.closest('.md-b'); if (db) { DET.b = +db.getAttribute('data-b'); detAct(DET.b); return; }
+    if (DET) { if (!e.target.closest('.md-box')) closeDet(); return; }
     var l = e.target.closest('[data-l]'); if (l) { S.lg = +l.getAttribute('data-l'); S.li = 0; S.area = 'lg'; draw(); return; }
     var tb = e.target.closest('[data-t]'); if (tb) { S.tab = +tb.getAttribute('data-t'); S.li = 0; S.area = 'tabs'; draw(); return; }
-    var r = e.target.closest('.mt-row'); if (r) { S.li = +r.getAttribute('data-i'); S.area = 'list'; draw(); watch(S.view[S.li]); }
+    var r = e.target.closest('.mt-row'); if (r) { S.li = +r.getAttribute('data-i'); S.area = 'list'; draw(); openDet(S.view[S.li]); }
   });
   built = true;
 }
@@ -173,9 +252,16 @@ MA.show = function () {
   draw();
   if (!S.ev.length || Date.now() - S.ts > 60000) load(!!S.ev.length); else schedule();
 };
-MA.hide = function () { shown = false; clearTimeout(timer); if (root) root.classList.add('hidden'); };
+MA.hide = function () { shown = false; clearTimeout(timer); closeDet(); if (root) root.classList.add('hidden'); };
 MA.onKey = function (e, k) {
   var used = true, v = S.view || [];
+  if (DET) {
+    var n = detBtns().length;
+    if (k === K.BACK || k === K.ESC) closeDet();
+    else if (k === K.LEFT) DET.b = Math.min(n - 1, DET.b + 1); else if (k === K.RIGHT) DET.b = Math.max(0, DET.b - 1);
+    else if (k === K.ENTER) { detAct(DET.b); e.preventDefault(); return true; }
+    drawDet(); e.preventDefault(); return true;
+  }
   if (k === K.BACK || k === K.ESC) { O.app.go('home'); e.preventDefault(); return true; }
   if (S.area === 'lg') {
     if (k === K.UP) S.lg = Math.max(0, S.lg - 1); else if (k === K.DOWN) S.lg = Math.min(LEAGUES.length - 1, S.lg + 1);
@@ -191,8 +277,7 @@ MA.onKey = function (e, k) {
     if (k === K.UP) { if (S.li > 0) S.li--; else S.area = 'tabs'; }
     else if (k === K.DOWN) S.li = Math.min(v.length - 1, S.li + 1);
     else if (k === K.LEFT) S.area = 'lg';
-    else if (k === K.ENTER) { if (v[S.li]) watch(v[S.li]); }
-    else if (k === K.MENU) { if (v[S.li]) rowMenu(v[S.li]); }
+    else if (k === K.ENTER || k === K.MENU) { if (v[S.li]) openDet(v[S.li]); }
     else used = false;
   }
   if (used) { draw(); e.preventDefault(); }

@@ -511,7 +511,7 @@ function back() {
     return;
   }
   if (S.overlay) { closeOverlay(); return; }
-  if (S.pick) { S.pick = null; O.app.go('multi'); return; }
+  if (S.pick) { S.pick = null; }
   O.app.back();
 }
 Live.overlayOpen = function () { return S.overlay; };
@@ -594,6 +594,7 @@ Live.show = function (arg) {
   root.classList.remove('hidden'); root.classList.remove('overlay');
   $('lvPrev').style.display = S.pick ? 'none' : '';
   $('lvInfo').style.display = S.pick ? 'none' : '';
+  var wantCat = arg && arg.cat;
   if (S.searching) {            /* opening the channels again: without the old search */
     var back = S.preSearch; S.searching = false; S.qh = ''; $('lvCatQ').value = '';
     if (back && S.cats.length) { loadList(back, false); }
@@ -604,6 +605,7 @@ Live.show = function (arg) {
       buildCats();
       var last = O.store.p('last.live', null), ent = null;
       if (last) S.cats.forEach(function (c) { if (c.id === last.cat) ent = c; });
+      if (wantCat) S.cats.forEach(function (c) { if (String(c.id) === String(wantCat)) ent = c; });
       if (!ent) ent = S.cats[PSEUDO] || S.cats[2];
       G.cats.draw();
       openCat(ent, true);
@@ -615,11 +617,19 @@ Live.show = function (arg) {
       S.retry = function () { S.err = null; Live.show(); };
     });
     setArea('cats');
+  } else if (wantCat) {                 /* opened for one package (e.g. from the matches) */
+    var want = null; S.cats.forEach(function (c) { if (String(c.id) === String(wantCat)) want = c; });
+    G.cats.draw();
+    if (want) { G.cats.setCur(S.catView.indexOf(want)); openCat(want, true); } else { drawCh(); setArea('cats'); }
   } else {
     refreshCounts(); G.cats.draw(); drawCh(); drawPrev(); drawInfo();
     setArea(S.view.length ? 'channels' : 'cats');
   }
   drawPrev();
+};
+/* the live packages whose name contains "spor" (Sport / Sports / Spor) — for the matches section */
+Live.sportCats = function (cb) {
+  D.getCats('live', function (cats) { cb(cats.filter(function (c) { return /spor/i.test(c.name); })); }, function () { cb([]); });
 };
 Live.hide = function () {
   shown = false; clearTimeout(zapT);
