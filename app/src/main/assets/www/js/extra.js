@@ -199,14 +199,14 @@ O.logout = function () {
    Fire TV has no Arabic system keyboard, so on TVs the search boxes use this one: Arabic + German, moved with the arrows. */
 var OSK = O.osk = {};
 var KB = { el: null, inp: null, lang: 'ar', r: 1, c: 0 };
-/* rows are written in screen order (left -> right). Arabic = the usual Arabic keyboard: ض at the right end. */
+/* rows are written in screen order (left -> right), like the Arabic keyboard on Samsung / Android phones: ض at the left. */
 function rv(a) { return a.slice().reverse(); }
 var LAY = {
   ar: [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '+'],
-       rv(['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج']),
-       rv(['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك', 'ط']),
-       rv(['ئ', 'ء', 'ؤ', 'ر', 'لا', 'ى', 'ة', 'و', 'ز', 'ظ', 'د']),
-       rv(['ذ', 'أ', 'إ', 'آ', '-', '.', ':', '!', '؟', '،', '&'])],
+       ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'],
+       ['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك', 'ط'],
+       ['ذ', 'ء', 'ؤ', 'ر', 'ى', 'ة', 'و', 'ز', 'ظ', 'د', 'ئ'],
+       ['أ', 'إ', 'آ', 'لا', '-', '.', ':', '!', '؟', '،', '&']],
   de: [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'ß'],
        ['q', 'w', 'e', 'r', 't', 'z', 'u', 'i', 'o', 'p', 'ü'],
        ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'ö', 'ä'],
@@ -261,7 +261,7 @@ OSK.open = function (inp) {
       KB.r = +b.getAttribute('data-r'); KB.c = +b.getAttribute('data-c'); kPress(kRows()[KB.r][KB.c]);
     });
   }
-  KB.inp = inp; KB.lang = O.cfg.get('oskLang', 'ar'); KB.r = 1; KB.c = KB.lang === 'ar' ? LAY.ar[1].length - 1 : 0;   /* start on ض / q */
+  KB.inp = inp; KB.lang = O.cfg.get('oskLang', 'ar'); KB.r = 1; KB.c = 0;   /* start on ض / q */
   inp.classList.add('osk-on');
   KB.el.classList.remove('hidden'); kDraw();
 };
